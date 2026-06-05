@@ -2,16 +2,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteWorkspace } from '@/features/dashboard/api/delete-workspace';
 import { readWorkspace } from '@/features/dashboard/api/read-workspace';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useAuthStore } from '@/features/auth/store/auth-store';
 
 export function useDeleteWorkspace() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
 
   return useMutation({
     mutationFn: async ({ workspaceId, deleteTeam = false }: { workspaceId: string; deleteTeam?: boolean }) => {
       if (!user) throw new Error('You must be logged in');
-      // Optional: verify ownership before deleting
       const workspace = await readWorkspace(workspaceId);
       if (workspace.ownerId !== user.$id) {
         throw new Error('You do not have permission to delete this workspace');

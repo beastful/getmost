@@ -25,7 +25,7 @@ export async function updateWorkspace(
       name: updated.name,
       ownerId: updated.ownerId,
       teamId: updated.teamId,
-      entities: JSON.parse(updated.entities),
+      entities: updated.entities,
       $createdAt: updated.$createdAt,
       $updatedAt: updated.$updatedAt,
     };

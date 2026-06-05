@@ -1,12 +1,12 @@
 // features/workspaces/hooks/use-create-workspace.ts
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createWorkspace } from '@/features/dashboard/api/create-workspace';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useAuthStore } from '@/features/auth/store/auth-store';
 import type { CreateWorkspaceData } from '../types/types';
 
 export function useCreateWorkspace() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
 
   return useMutation({
     mutationFn: async (data: Omit<CreateWorkspaceData, 'ownerId'>) => {

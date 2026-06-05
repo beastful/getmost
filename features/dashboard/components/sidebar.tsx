@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { NavDocuments } from "@/components/nav-documents"
+import { NavDocuments } from "@/features/dashboard/components/nav-documents"
 import { NavMain } from "./nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
@@ -15,7 +15,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, Settings, Store, StarIcon } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, Settings, Store, StarIcon, Box, Clapperboard } from "lucide-react"
 
 const data = {
     user: {
@@ -36,20 +36,6 @@ const data = {
             url: "/dashboard/analytics",
             icon: (
                 <ChartBarIcon />
-            ),
-        },
-        {
-            title: "Настройки",
-            url: "/dashboard/settings",
-            icon: (
-                <Settings />
-            ),
-        },
-        {
-            title: "Магазин",
-            url: "/dashboard/store",
-            icon: (
-                <Store />
             ),
         },
         {
@@ -119,53 +105,41 @@ const data = {
     ],
     navSecondary: [
         {
-            title: "Settings",
-            url: "#",
+            title: "Настройки",
+            url: "/dashboard/settings",
             icon: (
-                <Settings2Icon
-                />
+                <Settings2Icon />
             ),
         },
         {
-            title: "Get Help",
+            title: "Помощь",
             url: "#",
             icon: (
                 <CircleHelpIcon
                 />
             ),
-        },
-        {
-            title: "Search",
-            url: "#",
-            icon: (
-                <SearchIcon
-                />
-            ),
-        },
+        }
     ],
     documents: [
-        {
-            name: "Data Library",
-            url: "#",
+         {
+            name: "Магазин",
+            url: "/dashboard/store",
             icon: (
-                <DatabaseIcon
-                />
+                <Store />
             ),
         },
         {
-            name: "Reports",
-            url: "#",
+            name: "Хаб",
+            url: "/dashboard/featured",
             icon: (
-                <FileChartColumnIcon
-                />
+                <Box />
             ),
         },
         {
-            name: "Word Assistant",
-            url: "#",
+            name: "Витрина",
+            url: "/dashboard/featured",
             icon: (
-                <FileIcon
-                />
+                <Clapperboard />
             ),
         },
     ],

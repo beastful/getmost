@@ -1,223 +1,134 @@
-"use client"
+// hooks/useAuth.ts
+'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { account } from '@/lib/appwrite';
-import { ID, Models } from 'appwrite'; // Import ID helper
-import { useRouter } from 'next/navigation';
+import { ID, AppwriteException } from 'appwrite';
+import { useAuthStore } from '@/features/auth/store/auth-store';
 
-interface UseAuthReturn {
-  user: Models.User<Models.Preferences> | null;
-  loading: boolean;
-  error: string | null;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  sendVerificationEmail: () => Promise<void>;
-  verifyEmail: (userId: string, secret: string) => Promise<void>;
-  sendMagicLink: (email: string) => Promise<void>;
-  verifyMagicLink: (userId: string, secret: string) => Promise<void>; // NEW: required for callback
-  logout: () => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>;
-  resetPassword: (userId: string, secret: string, password: string) => Promise<void>;
+const getOrigin = () => {
+  if (typeof window === 'undefined') return '';
+  return window.location.origin;
+};
+
+interface AuthError {
+  message: string;
+  code?: number;
+  type?: string;
 }
 
-export const useAuth = (): UseAuthReturn => {
-  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+export function useAuth() {
+  const { setUser, setLoading, setError, clearError } = useAuthStore();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const currentUser = await account.get();
-        setUser(currentUser);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  const signUp = async (email: string, password: string, name?: string) => {
+  const wrap = useCallback(async <T,>(
+    fn: () => Promise<T>
+  ): Promise<{ data: T | null; error: AuthError | null }> => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
-      // 1. Create the user
-      const newUser = await account.create({
+      const data = await fn();
+      return { data, error: null };
+    } catch (err) {
+      const error = err instanceof AppwriteException
+        ? { message: err.message, code: err.code, type: err.type }
+        : { message: String(err) };
+      setError(error.message);
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError, clearError]);
+
+  const signUp = useCallback(async (email: string, password: string, name?: string) => {
+    const { data: newUser, error } = await wrap(async () => {
+      const user = await account.create({
         userId: ID.unique(),
         email,
         password,
-        name
+        name,
       });
-
-      // 2. Create a session (required before sending verification)
       await account.createEmailPasswordSession({ email, password });
-
-      // 3. Now send verification email
       await account.createEmailVerification({
-        url: `${window.location.origin}/verify-email`
+        url: `${getOrigin()}/verify-email`,
       });
-
-      const currentUser = await account.get();
-      setUser(currentUser);
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
+      return user;
+    });
+    
+    if (newUser) {
+      const { data: currentUser } = await wrap(() => account.get());
+      if (currentUser) setUser(currentUser);
     }
-  };
+    
+    return { success: !error, error };
+  }, [wrap, setUser]);
 
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    try {
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await wrap(async () => {
       await account.createEmailPasswordSession({ email, password });
-      const currentUser = await account.get();
-      setUser(currentUser);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+      const user = await account.get();
+      setUser(user);
+    });
+    return { success: !error, error };
+  }, [wrap, setUser]);
 
-  const sendVerificationEmail = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await account.createEmailVerification({
-        url: `${window.location.origin}/verify-email`
-      });
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const logout = useCallback(async () => {
+    const { error } = await wrap(() => account.deleteSessions());
+    if (!error) setUser(null);
+    return { success: !error, error };
+  }, [wrap, setUser]);
 
-  const verifyEmail = async (userId: string, secret: string) => {
-    setLoading(true);
-    setError(null);
-    try {
+  const sendVerificationEmail = useCallback(async () => {
+    return wrap(() => account.createEmailVerification({
+      url: `${getOrigin()}/verify-email`,
+    }));
+  }, [wrap]);
+
+  const verifyEmail = useCallback(async (userId: string, secret: string) => {
+    const { error } = await wrap(async () => {
       await account.updateEmailVerification({ userId, secret });
-      const refreshedUser = await account.get();
-      setUser(refreshedUser);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+      const user = await account.get();
+      setUser(user);
+    });
+    return { success: !error, error };
+  }, [wrap, setUser]);
 
-  const sendMagicLink = async (email: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await account.createMagicURLToken({
-        userId: ID.unique(),
-        email,
-        url: `${window.location.origin}/magic-callback`
-      });
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const sendMagicLink = useCallback(async (email: string) => {
+    return wrap(() => account.createMagicURLToken({
+      userId: ID.unique(),
+      email,
+      url: `${getOrigin()}/magic-callback`,
+    }));
+  }, [wrap]);
 
-  // NEW: Call this on your /magic-callback page when user clicks the link
-  const verifyMagicLink = async (userId: string, secret: string) => {
-    setLoading(true);
-    try {
+  const verifyMagicLink = useCallback(async (userId: string, secret: string) => {
+    const { error } = await wrap(async () => {
       await account.createSession({ userId, secret });
-      const currentUser = await account.get();
-      setUser(currentUser);
-      router.push('/dashboard');
-    } catch (err: any) {
-      // Token invalid but user already has session? Then it's fine.
-      if (err?.type === 'user_invalid_token') {
-        const existingUser = await account.get().catch(() => null);
-        if (existingUser) {
-          setUser(existingUser);
-          router.push('/dashboard');
-          return;
-        }
-      }
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+      const user = await account.get();
+      setUser(user);
+    });
+    return { success: !error, error };
+  }, [wrap, setUser]);
 
-  const logout = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await account.deleteSessions();
-      setUser(null);
-      router.push('/login');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const sendPasswordReset = useCallback(async (email: string) => {
+    return wrap(() => account.createRecovery({
+      email,
+      url: `${getOrigin()}/reset-password`,
+    }));
+  }, [wrap]);
 
-  const sendPasswordReset = async (email: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await account.createRecovery({
-        email,
-        url: `${window.location.origin}/reset-password`,
-      });
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetPassword = async (userId: string, secret: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await account.updateRecovery({
-        userId,
-        secret,
-        password,
-        // passwordAgain: password, // Uncomment if your SDK version requires this field
-      });
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const resetPassword = useCallback(async (userId: string, secret: string, password: string) => {
+    return wrap(() => account.updateRecovery({ userId, secret, password }));
+  }, [wrap]);
 
   return {
-    user,
-    loading,
-    error,
     signUp,
     signIn,
+    logout,
     sendVerificationEmail,
     verifyEmail,
     sendMagicLink,
-    verifyMagicLink, // Export the new handler
-    sendPasswordReset, // add
-    resetPassword,     // add
-    logout,
+    verifyMagicLink,
+    sendPasswordReset,
+    resetPassword,
   };
-};
+}

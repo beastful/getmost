@@ -1,30 +1,39 @@
-// features/workspaces/hooks/use-workspaces.ts
 import { useQuery } from '@tanstack/react-query';
-import { listWorkspaces } from '@/features/dashboard/api/list-workspaces';
-import { useAuthStore } from '@/features/auth/store/auth-store';
+import { listEntities } from '@/features/project/api/list-entities';
 import { useState } from 'react';
 
-interface UseWorkspacesOptions {
-  limit?: number;
+interface UseEntitiesOptions {
+  workspaceId?: string;
+  public?: boolean;
+  featured?: boolean;
+  store?: boolean;
   search?: string;
+  limit?: number;
 }
 
-export function useWorkspaces({ limit = 10, search }: UseWorkspacesOptions = {}) {
-  const user = useAuthStore((s) => s.user);
+export function useEntities({
+  workspaceId,
+  public: isPublic,
+  featured,
+  store,
+  search,
+  limit = 10,
+}: UseEntitiesOptions = {}) {
   const [page, setPage] = useState(1);
 
   const query = useQuery({
-    queryKey: ['workspaces', { ownerId: user?.$id, search, page, limit }],
-    queryFn: async () => {
-      if (!user) throw new Error('You must be logged in to view workspaces');
-      return listWorkspaces({
-        ownerId: user.$id,
+    queryKey: ['entities', { workspaceId, isPublic, featured, store, search, page, limit }],
+    queryFn: () =>
+      listEntities({
+        workspaceId,
+        public: isPublic,
+        featured,
+        store,
+        search,
         limit,
         offset: (page - 1) * limit,
-        search,
-      });
-    },
-    enabled: !!user,
+      }),
+    enabled: !!workspaceId,
   });
 
   const total = query.data?.total ?? 0;
@@ -36,7 +45,7 @@ export function useWorkspaces({ limit = 10, search }: UseWorkspacesOptions = {})
 
   return {
     ...query,
-    workspaces: query.data?.workspaces ?? [],
+    entities: query.data?.entities ?? [],
     pagination: {
       page,
       totalPages,

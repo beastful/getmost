@@ -2,11 +2,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { readWorkspace } from '@/features/dashboard/api/read-workspace';
 import { updateWorkspace } from '@/features/dashboard/api/update-workspace';
-import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useAuthStore } from '@/features/auth/store/auth-store';
 
 export function useUpdateWorkspace() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
 
   return useMutation({
     mutationFn: async ({ workspaceId, data }: { workspaceId: string; data: any }) => {
@@ -23,3 +23,4 @@ export function useUpdateWorkspace() {
     },
   });
 }
+
