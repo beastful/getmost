@@ -70,6 +70,9 @@ interface GraphStore extends ListState, EditorState {
   currentIsDirty: () => boolean;
   currentIsSaving: () => boolean;
 
+  // ── Сброс при смене рабочей области ──
+  resetWorkspace: () => void;
+
   // ── Realtime ──
   _applyRemoteUpdate: (remote: Entity) => void;
 }
@@ -161,6 +164,22 @@ export const useGraphStore = create<GraphStore>()(
       } catch (err) {
         set({ listError: String(err), isLoading: false });
       }
+    },
+
+    // ═══════════════════════════════════════
+    // СБРОС ПРИ СМЕНЕ РАБОЧЕЙ ОБЛАСТИ
+    // ═══════════════════════════════════════
+
+    resetWorkspace: () => {
+      unsubscribeRealtime();
+      set({
+        activeEntityId: null,
+        drafts: {},
+        entities: [],
+        total: 0,
+        listError: null,
+        isLoading: false,
+      });
     },
 
     // ═══════════════════════════════════════

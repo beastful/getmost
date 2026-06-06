@@ -5,7 +5,7 @@ import * as React from "react"
 import { NavDocuments } from "@/features/dashboard/components/nav-documents"
 import { NavMain } from "./nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavUser } from "@/features/auth/components/nav-user"
 import {
     Sidebar,
     SidebarContent,
@@ -184,7 +184,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <NavSecondary items={data.navSecondary} className="mt-auto" />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser user={data.user} />
+                <NavUser />
             </SidebarFooter>
         </Sidebar>
     )
