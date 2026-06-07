@@ -1,27 +1,36 @@
 // features/graph-editor/components/Palette.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { PaletteIcon } from 'lucide-react';
+import { PaletteIcon, Search } from 'lucide-react';
 import { NODES } from '@/features/graph-builder/lib/data/nodes';
-import { Card } from '@/components/ui/card';
-import { useGraphStore } from '../store/graph-store';
+import { Input } from '@/components/ui/input';
+import { GraphActionsContext } from './graph-editor'; // adjust path if needed
 
 export function Palette() {
   const [open, setOpen] = useState(false);
-  const addNode = useGraphStore((s) => s.addNode);
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const { addNodeAtCenter } = React.useContext(GraphActionsContext);
 
-  const grouped = NODES.reduce((acc, node) => {
-    acc[node.category] = acc[node.category] || [];
-    acc[node.category].push(node);
-    return acc;
-  }, {} as Record<string, typeof NODES>);
+  const categories = useMemo(() => {
+    const set = new Set(NODES.map((n) => n.category));
+    return ['All', ...Array.from(set)];
+  }, []);
+
+  const filtered = useMemo(() => {
+    return NODES.filter((node) => {
+      const matchesCategory = activeCategory === 'All' || node.category === activeCategory;
+      const matchesSearch = node.name.toLowerCase().includes(query.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [query, activeCategory]);
 
   return (
     <div className="relative inline-flex">
-      <div className="relative inline-flex overflow-hidden rounded-lg p-[2px]">
-        <span className="p-50 absolute inset-[-100%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_180deg_at_50%_50%,#ec4899_0%,#a855f7_25%,#d946ef_50%,#8b5cf6_75%,#ec4899_100%)]" />
+      <div className="relative inline-flex overflow-hidden rounded-lg p-[3px]">
+        <span className="absolute p-50 inset-[-100%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_180deg_at_50%_50%,#ec4899_0%,#a855f7_25%,#d946ef_50%,#8b5cf6_75%,#ec4899_100%)]" />
         <Button
           variant="ghost"
           size="lg"
@@ -37,32 +46,67 @@ export function Palette() {
       </div>
 
       {open && (
-        <div className="absolute translate-y-[-100%] left-[50%] translate-x-[-50%] pb-[20px]">
-          <Card className="bg-background h-[300px] overflow-y-auto">
-            {Object.entries(grouped).map(([category, nodes]) => (
-              <div key={category} className="p-2">
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  {category}
+        <div className="absolute translate-y-[-100%] left-[50%] translate-x-[-50%] pb-[20px] w-[450px]">
+          <div className="bg-background p-5 shadow-md rounded-md border-2 h-full flex flex-col gap-5">
+            {/* Поиск */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Поиск по блокам"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <Button size="icon" variant="secondary">
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Фильтры по категориям */}
+            <div className="flex gap-1 flex-wrap">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`py-1 px-3 rounded-full text-sm font-semibold transition-colors ${
+                    activeCategory === cat
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Сетка блоков */}
+            <div className="grid grid-cols-2 gap-3 h-[200px] overflow-y-auto content-start">
+              {filtered.map((node) => (
+                <button
+                  key={node.name}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    addNodeAtCenter(node.name);
+                    setOpen(false);
+                    setQuery('');
+                  }}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors text-left"
+                >
+                  <div className="w-[50px] h-[50px] bg-muted rounded-lg flex items-center justify-center text-foreground shrink-0">
+                    <node.icon />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">{node.name}</div>
+                    <div className="text-xs text-muted-foreground">{node.category}</div>
+                  </div>
+                </button>
+              ))}
+
+              {filtered.length === 0 && (
+                <div className="col-span-2 text-center text-sm text-muted-foreground py-8">
+                  Блоки не найдены
                 </div>
-                {nodes.map((node) => (
-                  <button
-                    key={node.name}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      addNode(node.name);
-                      setOpen(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-gray-100 text-left text-sm text-gray-700 transition-colors"
-                  >
-                    <span className="w-4 h-4 flex items-center justify-center text-gray-500">
-                      <node.icon />
-                    </span>
-                    {node.name}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </Card>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

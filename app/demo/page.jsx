@@ -1,109 +1,168 @@
-"use client"
+'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
+import { HocuspocusProvider } from '@hocuspocus/provider';
 
-function CollaborativeEditor() {
-  const textareaRef = useRef(null);
-  const [connected, setConnected] = useState(false);
+// Generate a random color for the current user
+const getRandomColor = () => {
+  const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+export default function CollaborativeEditor() {
+  const [status, setStatus] = useState('disconnected');
+  const [docContent, setDocContent] = useState('');
+  const [users, setUsers] = useState([]);
+  const [currentUserColor, setCurrentUserColor] = useState('#000000');
+  
   const providerRef = useRef(null);
-  const yTextRef = useRef(null);
+  const ydocRef = useRef(null);
 
   useEffect(() => {
-    // 1. Create Yjs doc and shared text
+    // 1. Setup Yjs
     const ydoc = new Y.Doc();
-    const yText = ydoc.getText('editor');
-    yTextRef.current = yText;
-
-    // 2. Connect to the WebSocket server
-    const provider = new WebsocketProvider(
-      'ws://176.109.108.83:1234',   // server URL
-      'my-document',                // document name (appended as path)
-      ydoc,
-      { connect: true }
-    );
+    ydocRef.current = ydoc;
+    const ytext = ydoc.getText('codemirror');
+    
+    // 2. Setup User Info
+    const userColor = getRandomColor();
+    setCurrentUserColor(userColor);
+    
+    // 3. Setup Provider (Do NOT pass 'awareness' config here, let it create itself)
+    const provider = new HocuspocusProvider({
+      url: 'wss://ws.getmost.app',
+      name: 'demo-document',
+      document: ydoc,
+    });
+    
     providerRef.current = provider;
 
-    // 3. Set initial connection status (fix for missing 'status' event on fast connect)
-    const setInitialStatus = () => {
-      if (provider.ws?.readyState === WebSocket.OPEN) {
-        setConnected(true);
-      } else {
-        setConnected(false);
-      }
-    };
-    setInitialStatus();
-
-    // 4. Monitor connection status for future changes
-    provider.on('status', event => {
-      console.log('WebSocket status:', event.status);
-      setConnected(event.status === 'connected');
+    // 4. Set Local State (Who am I?)
+    // Access the internal awareness instance directly from the provider
+    provider.awareness.setLocalStateField('user', {
+      name: 'User ' + Math.floor(Math.random() * 1000),
+      color: userColor,
     });
 
-    // 5. Sync remote changes -> textarea
-    const updateTextarea = () => {
-      if (!textareaRef.current) return;
-      const remoteValue = yText.toString();
-      const currentValue = textareaRef.current.value;
-      if (currentValue !== remoteValue) {
-        textareaRef.current.value = remoteValue;
+    // 5. Listen to Status
+    provider.on('status', (event) => {
+      setStatus(event.status);
+      if (event.status === 'connected') {
+        console.log('🚀 Connected to Hocuspocus');
       }
-    };
-    yText.observe(updateTextarea);
-    updateTextarea();
+    });
 
-    // 6. Sync local changes -> Yjs
-    const handleLocalChange = (e) => {
-      const newValue = e.target.value;
-      const oldValue = yText.toString();
-      if (newValue === oldValue) return;
-      // Replace the whole text (simple and reliable)
-      ydoc.transact(() => {
-        yText.delete(0, yText.length);
-        yText.insert(0, newValue);
-      });
-    };
-    const textarea = textareaRef.current;
-    textarea.addEventListener('input', handleLocalChange);
+    // 6. Listen to Document Changes
+    ytext.observe((event) => {
+      const content = ytext.toString();
+      setDocContent(content);
+    });
 
-    // 7. Cleanup
+    // 7. Listen to Awareness (Active Users)
+    const updateUsers = () => {
+      // Get all states from the awareness map
+      const states = Array.from(provider.awareness.getStates().values());
+      setUsers(states);
+    };
+    
+    // Initial load
+    updateUsers();
+    
+    // Subscribe to changes
+    provider.awareness.on('change', updateUsers);
+
+    // Cleanup on unmount
     return () => {
-      yText.unobserve(updateTextarea);
-      textarea.removeEventListener('input', handleLocalChange);
+      provider.awareness.off('change', updateUsers); // Remove listener
       provider.destroy();
       ydoc.destroy();
     };
   }, []);
 
+  const handleChange = (e) => {
+    const newValue = e.target.value;
+    setDocContent(newValue);
+    
+    const ydoc = ydocRef.current;
+    if (ydoc) {
+      const ytext = ydoc.getText('codemirror');
+      ydoc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, newValue);
+      });
+    }
+  };
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h2>Collaborative Text Editor (y-websocket)</h2>
-      <div style={{ marginBottom: '10px' }}>
-        Status:{' '}
-        <span style={{ color: connected ? 'green' : 'red', fontWeight: 'bold' }}>
-          {connected ? '● Connected' : '○ Disconnected'}
-        </span>
+    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
+      
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>Hocuspocus Collaborative Demo wss://ws.getmost.app</h1>
+        
+        {/* Status Badge */}
+        <div style={{
+            padding: '5px 10px', 
+            borderRadius: '5px', 
+            fontWeight: 'bold',
+            backgroundColor: status === 'connected' ? '#dcfce7' : '#fee2e2',
+            color: status === 'connected' ? '#166534' : '#991b1b'
+        }}>
+          {status.toUpperCase()}
+        </div>
       </div>
+
+      {/* Active Users List */}
+      <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
+        <strong>Active Users ({users.length}):</strong>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '5px', flexWrap: 'wrap' }}>
+          {users.length === 0 && <span style={{ color: '#666' }}>No one is here...</span>}
+          {users.map((state, index) => (
+            <span key={index} style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '2px 8px',
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                border: `1px solid ${state?.user?.color || '#ccc'}`,
+                fontSize: '0.85rem'
+            }}>
+                <span style={{
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    backgroundColor: state?.user?.color || '#ccc',
+                    marginRight: '6px'
+                }}></span>
+                {state?.user?.name || 'Anonymous'}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Editor */}
       <textarea
-        ref={textareaRef}
-        style={{
-          width: '100%',
-          height: '300px',
-          padding: '12px',
+        value={docContent}
+        onChange={handleChange}
+        placeholder="Start typing to see real-time sync..."
+        style={{ 
+          width: '100%', 
+          height: '300px', 
+          padding: '15px',
           fontSize: '16px',
-          fontFamily: 'monospace',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
+          lineHeight: '1.5',
+          border: '1px solid #d1d5db',
+          borderRadius: '8px',
           resize: 'vertical',
+          outline: 'none',
+          fontFamily: 'monospace'
         }}
-        placeholder="Start typing collaboratively..."
       />
-      <p style={{ fontSize: '14px', color: '#555', marginTop: '8px' }}>
-        ✨ Open multiple tabs – sync is instant and reliable.
+      
+      <p style={{ marginTop: '10px', color: '#6b7280', fontSize: '0.875rem' }}>
+        Open this page in a second browser tab to see the "Active Users" count increase to 2.
       </p>
     </div>
   );
 }
-
-export default CollaborativeEditor;
