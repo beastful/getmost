@@ -1,51 +1,26 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+// features/graph-editor/lib/nodes.ts
+
+import React, { useState } from "react";
 import { JSONLangEngine } from "../JLR/json-lang-engine";
-import { Box } from "lucide-react";
-import { useGraphStore } from "../../store/graph-store";
 
 const engine = new JSONLangEngine({ debug: false, trace: false, maxGas: 100000 });
 
-/* ---------- Natives ---------- */
-engine.registerNative("$input", (args) => args[1]);
-engine.registerNative("json_parse", (args: any[]) => JSON.parse(args[0]));
-engine.registerNative("json_stringify", (args: any[]) => JSON.stringify(args[0], null, args[1] ?? undefined));
-engine.registerNative("build_query", (args: any[]) => new URLSearchParams(args[0]).toString());
-engine.registerNative("to_number", (args: any[]) => {
-    const val = args[0];
-    if (typeof val === "number") return val;
-    if (typeof val === "string" && !isNaN(Number(val))) return Number(val);
-    return 0;
-});
-engine.registerNative("fetch_advanced", async (args: any[]) => {
-    const [url, options = {}] = args;
-    const res = await fetch(url, options);
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch { }
-    return { status: res.status, ok: res.ok, headers: Object.fromEntries(res.headers.entries()), data, text };
-});
-engine.registerNative("html_query", (args: any[]) => {
-    const [html, selector, mode = "text", attrName = ""] = args;
-    if (typeof html !== "string") return null;
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const el = doc.querySelector(selector);
-    if (!el) return null;
-    if (mode === "text") return el.textContent ?? null;
-    if (mode === "html") return el.innerHTML ?? null;
-    if (mode === "attr") return el.getAttribute(attrName) ?? null;
-    return null;
-});
+export async function evaluateJSONLang(expr: any): Promise<any> {
+    if (expr === null || typeof expr !== "object") return expr;
+    return engine.process(expr);
+}
 
-engine.registerOpaque(
-    "div", "span", "p", "button", "input", "h1", "h2", "h3", "h4", "h5", "h6",
-    "img", "a", "ul", "ol", "li", "form", "label", "textarea", "select",
-    "option", "section", "article", "header", "footer", "main", "nav",
-    "aside", "strong", "em", "code", "pre"
-);
+export interface NodeInput {
+    id: string;
+    name: string;
+}
 
-/* ---------- Types ---------- */
-export interface NodeInput { id: string; name: string; }
-export interface NodeOutput { id: string; name: string; template: any; }
+export interface NodeOutput {
+    id: string;
+    name: string;
+    template: any; // JSON‑Lang AST or primitive
+}
+
 export interface NodeDef {
     name: string;
     category: string;
@@ -64,181 +39,7 @@ export interface NodeDef {
     }>;
 }
 
-/* ---------- Registry ---------- */
-export const NODE_REGISTRY = new Map<string, NodeDef>();
-
-/* ---------- AST helpers ---------- */
-export function substituteInputs(expr: any, inputs: Record<string, any>, seen = new WeakSet<any>()): any {
-    if (expr === null || typeof expr !== "object") return expr;
-    if (seen.has(expr)) return expr;
-    seen.add(expr);
-
-    if (Array.isArray(expr)) {
-        const [head, ...args] = expr;
-        if (head === "$input" && args.length >= 1 && typeof args[0] === "string") {
-            const wireId = args[0];
-            if (wireId in inputs) return inputs[wireId];
-            if (args.length >= 2) return substituteInputs(args[1], inputs, seen);
-            return expr;
-        }
-        return expr.map((item) => substituteInputs(item, inputs, seen));
-    }
-
-    const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(expr)) {
-        out[k] = substituteInputs(v, inputs, seen);
-    }
-    return out;
-}
-
-export function collectInputRefs(expr: any, set: Set<string>, seen = new WeakSet<any>()) {
-    if (!Array.isArray(expr) || expr.length === 0) return;
-    if (seen.has(expr)) return;
-    seen.add(expr);
-    const [head, ...args] = expr;
-    if (head === "$input" && args.length >= 1 && typeof args[0] === "string") set.add(args[0]);
-    for (const arg of args) collectInputRefs(arg, set, seen);
-}
-
-/* ---------- Flatten outputs ---------- */
-function isTuple(v: any): v is [string, string, any] {
-    return Array.isArray(v) && v.length === 3 && typeof v[0] === "string" && typeof v[1] === "string";
-}
-
-function flattenOutputs(raw: any[]): [string, string, any][] {
-    const result: [string, string, any][] = [];
-    const dive = (item: any) => {
-        if (item === null || item === undefined) return;
-        if (!Array.isArray(item) && typeof item === "object" && item.id && item.name) {
-            result.push([item.id, item.name, item.template]);
-            return;
-        }
-        if (!Array.isArray(item)) return;
-        if (isTuple(item)) {
-            result.push(item);
-            return;
-        }
-        for (const child of item) dive(child);
-    };
-    for (const item of raw) dive(item);
-    return result;
-}
-
-/* ---------- Factories ---------- */
-export function createNodeFromExprs(def: {
-    name: string;
-    category: string;
-    width?: number;
-    state?: Record<string, any>;
-    inputs?: NodeInput[];
-    outputs: [string, string, any][];
-    visual?: NodeDef["visual"];
-    icon?: NodeDef["icon"];
-    controlled?: boolean;
-}): NodeDef {
-    const inputSet = new Set<string>();
-    for (const [, , template] of def.outputs) collectInputRefs(template, inputSet);
-    const autoInputs = Array.from(inputSet).map((name) => ({ id: name, name }));
-    const explicitInputs = def.inputs || [];
-    const inputMap = new Map<string, NodeInput>();
-    for (const inp of autoInputs) inputMap.set(inp.id, inp);
-    for (const inp of explicitInputs) inputMap.set(inp.id, inp);
-    const inputs = Array.from(inputMap.values());
-    const outputs: NodeOutput[] = def.outputs.map(([id, name, template]) => ({ id, name, template }));
-    return {
-        name: def.name,
-        category: def.category,
-        width: def.width,
-        inputs,
-        outputs,
-        defaultState: def.state || {},
-        icon: def.icon || (() => null),
-        controlled: def.controlled ?? true,
-        visual: def.visual || (({ getTemplate, inputs: inputVals }) => (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {inputs.length > 0 && (
-                    <div>
-                        <L text="Inputs" />
-                        {inputs.map((inp) => (
-                            <div key={inp.id} style={{ marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, color: "#4f46e5", fontWeight: 600 }}>{inp.name}: </span>
-                                <span style={{ fontSize: 11, color: "#374151" }}>{JSON.stringify(inputVals[inp.id])}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                <div>
-                    <L text="Outputs" />
-                    {outputs.map((out) => (
-                        <div key={out.id} style={{ marginBottom: 4 }}>
-                            <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>{out.name}: </span>
-                            <Preview value={getTemplate(out.id)} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )),
-    };
-}
-
-export function buildNodeFromPayload(payload: {
-    name: string;
-    category: string;
-    width?: number;
-    state?: Record<string, any>;
-    inputs?: NodeInput[];
-    outputs: any[];
-    visual?: NodeDef["visual"];
-    icon?: NodeDef["icon"];
-    controlled?: boolean;
-}): NodeDef {
-    const flattenedOutputs = flattenOutputs(payload.outputs);
-    const inputSet = new Set<string>();
-    for (const [, , template] of flattenedOutputs) collectInputRefs(template, inputSet);
-    const autoInputs = Array.from(inputSet).map((name) => ({ id: name, name }));
-    const explicitInputs = payload.inputs || [];
-    const inputMap = new Map<string, NodeInput>();
-    for (const inp of autoInputs) inputMap.set(inp.id, inp);
-    for (const inp of explicitInputs) inputMap.set(inp.id, inp);
-    const inputs = Array.from(inputMap.values());
-    const outputs: NodeOutput[] = flattenedOutputs.map(([id, name, template]) => ({ id, name, template }));
-    return {
-        name: payload.name,
-        category: payload.category,
-        width: payload.width,
-        inputs,
-        outputs,
-        defaultState: payload.state || {},
-        icon: payload.icon || (() => null),
-        controlled: payload.controlled ?? true,
-        visual: payload.visual || (({ getTemplate, inputs: inputVals }) => (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {inputs.length > 0 && (
-                    <div>
-                        <L text="Inputs" />
-                        {inputs.map((inp) => (
-                            <div key={inp.id} style={{ marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, color: "#4f46e5", fontWeight: 600 }}>{inp.name}: </span>
-                                <span style={{ fontSize: 11, color: "#374151" }}>{JSON.stringify(inputVals[inp.id])}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                <div>
-                    <L text="Outputs" />
-                    {outputs.map((out) => (
-                        <div key={out.id} style={{ marginBottom: 4 }}>
-                            <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>{out.name}: </span>
-                            <Preview value={getTemplate(out.id)} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )),
-    };
-}
-
-/* ---------- UI primitives ---------- */
+// UI primitives
 const L: React.FC<{ text: string }> = ({ text }) => (
     <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, fontWeight: 600 }}>
         {text}
@@ -283,46 +84,9 @@ const Preview: React.FC<{ value: any }> = ({ value }) => (
     </pre>
 );
 
-/* ---------- Export evaluation ---------- */
-export async function evaluateJSONLang(expr: any): Promise<any> {
-    if (expr === null || typeof expr !== "object") return expr;
-    return engine.process(expr);
-}
-export { engine };
-
-const safeJsonParse = (str: string, fallback: any) => {
-    try { return JSON.parse(str); } catch { return fallback; }
-};
-
-const LucideIcons: Record<string, any> = { Box };
-
-/* ---------- Copy button helper ---------- */
-const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label = "Copy" }) => {
-    const [copied, setCopied] = useState(false);
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch { }
-    };
-    return (
-        <button
-            onClick={handleCopy}
-            style={{
-                padding: "3px 10px", borderRadius: 4, border: "1px solid #e5e7eb",
-                background: copied ? "#d1fae5" : "#f9fafb", color: copied ? "#059669" : "#374151",
-                fontSize: 10, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-            }}
-        >
-            {copied ? "Copied!" : label}
-        </button>
-    );
-};
-
-/* ---------- Nodes ---------- */
+// Static node definitions – no $input references, no metaprogramming
 export const NODES: NodeDef[] = [
-    /* --- Primitives --- */
+    // --- Primitives ---
     {
         name: "Number", category: "Basic", inputs: [],
         outputs: [{ id: "out", name: "Value", template: (_, s) => s.value }],
@@ -393,7 +157,7 @@ export const NODES: NodeDef[] = [
         ),
     },
 
-    /* --- Math --- */
+    // --- Math ---
     {
         name: "Sum", category: "Math", inputs: [{ id: "a", name: "A" }, { id: "b", name: "B" }],
         outputs: [{ id: "out", name: "Result", template: (i) => ["sum", i.a ?? 0, i.b ?? 0] }],
@@ -485,8 +249,25 @@ export const NODES: NodeDef[] = [
         ),
         visual: ({ getTemplate }) => <Preview value={getTemplate("out")} />,
     },
+    {
+        name: "Scale", category: "Math",
+        inputs: [{ id: "valueA", name: "Value A" }, { id: "factor", name: "Factor" }],
+        outputs: [{ id: "scaled", name: "Scaled", template: (i) => ["multiply", i.valueA ?? 1, i.factor ?? 1] }],
+        defaultState: {},
+        icon: () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            </svg>
+        ),
+        visual: ({ getTemplate }) => (
+            <div>
+                <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center", padding: "4px 0", fontWeight: 500 }}>Value × Factor</div>
+                <Preview value={getTemplate("scaled")} />
+            </div>
+        ),
+    },
 
-    /* --- Array (for collecting Block Outputs) --- */
+    // --- Array ---
     {
         name: "Array", category: "Array",
         inputs: [
@@ -509,7 +290,7 @@ export const NODES: NodeDef[] = [
         ),
     },
 
-    /* --- API --- */
+    // --- API ---
     {
         name: "HttpAdvanced", category: "API",
         inputs: [
@@ -676,243 +457,84 @@ export const NODES: NodeDef[] = [
             </div>
         ),
     },
-
-    /* --- Meta / Metaprogramming --- */
     {
-        name: "Block Input", category: "Meta",
-        inputs: [{ id: "id", name: "ID" }, { id: "fallback", name: "Fallback" }],
-        outputs: [{ id: "ast", name: "AST", template: (i) => ["$input", String(i.id ?? "in"), i.fallback ?? 0] }],
-        defaultState: {},
-        icon: () => (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14" />
-            </svg>
-        ),
-        visual: ({ inputs, getTemplate }) => (
-            <div style={{ minWidth: 160 }}>
-                <L text="ID" /><Preview value={inputs.id} />
-                <L text="Fallback" /><Preview value={inputs.fallback} />
-                <div style={{ marginTop: 6 }}>
-                    <L text="AST" />
-                    <div style={{ padding: "4px 8px", background: "#fef3c7", borderRadius: 4, fontSize: 10, color: "#92400e", fontFamily: "monospace" }}>{JSON.stringify(getTemplate("ast"))}</div>
-                    <div style={{ marginTop: 6 }}><CopyButton text={JSON.stringify(getTemplate("ast"))} /></div>
-                </div>
-            </div>
-        ),
-    },
-    {
-        name: "Block Output", category: "Meta",
-        inputs: [{ id: "id", name: "ID" }, { id: "name", name: "Name" }, { id: "expr", name: "Expr" }],
-        outputs: [{
-            id: "def", name: "Def",
-            template: (i, s) => [
-                i.id ?? s.id ?? "out",
-                i.name ?? s.name ?? "Result",
-                i.expr ?? safeJsonParse(s.expr ?? '["$input","missing",0]', ["$input", "missing", 0]),
-            ],
-        }],
-        defaultState: { id: "out", name: "Result", expr: '["sum", ["$input", "A", 0], ["$input", "B", 0]]' },
-        icon: () => (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-            </svg>
-        ),
-        visual: ({ state, setState, inputs, getTemplate }) => {
-            const tpl = getTemplate("def");
-            return (
-                <div style={{ minWidth: 180 }}>
-                    <L text="ID" /><In value={state.id} onChange={(e) => setState("id", e.target.value)} />
-                    <L text="Name" /><In value={state.name} onChange={(e) => setState("name", e.target.value)} />
-                    <L text="Expression (JSON‑Lang AST)" />
-                    <textarea value={state.expr} onChange={(e) => setState("expr", e.target.value)} style={{ width: "100%", minHeight: 56, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: "2px solid #e5e7eb", padding: 6, resize: "vertical" }} />
-                    <div style={{ marginTop: 6 }}><L text="Wired expr (overrides)" /><Preview value={inputs.expr} /></div>
-                    <div style={{ marginTop: 6 }}><L text="Output tuple" /><Preview value={tpl} /></div>
-                    <div style={{ marginTop: 6 }}><CopyButton text={JSON.stringify(tpl, null, 2)} label="Copy Tuple" /></div>
-                </div>
-            );
+        name: "ExecuteOnClick",
+        category: "Interactive",
+        inputs: [{ id: "expr", name: "Expression" }], // accepts JSON‑Lang AST
+        outputs: [{ id: "result", name: "Result", template: (_, s) => s.lastResult }],
+        defaultState: {
+            lastResult: null,
         },
-    },
-    {
-        name: "Create Block", category: "Meta",
-        inputs: [{ id: "outputs", name: "Outputs" }],
-        outputs: [{ id: "done", name: "Done", template: () => null }],
-        defaultState: { name: "CustomBlock", category: "Custom", icon: "Box" },
-        icon: () => <Box size={16} />,
-        visual: ({ state, setState, inputs }) => {
-            const [status, setStatus] = useState("");
-            const { addNode } = useGraphStore();
+        icon: () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
+            </svg>
+        ),
+        visual: ({ inputs, state, setState, getTemplate }) => {
+            const [evalError, setEvalError] = useState<string | null>(null);
+            const [isRunning, setIsRunning] = useState(false);
 
-            const buildDef = (): NodeDef | null => {
-                const raw = inputs.outputs;
-                const outputsArray = isTuple(raw) ? [raw] : Array.isArray(raw) ? raw : raw ? [raw] : [];
-                const flattened = flattenOutputs(outputsArray);
-                if (flattened.length === 0) {
-                    setStatus("No valid outputs — wire Block Output nodes or Array");
-                    return null;
-                }
+            const runExpression = async () => {
+                setEvalError(null);
+                setIsRunning(true);
                 try {
-                    const IconComponent = (LucideIcons as any)[state.icon] || Box;
-                    const IconNode = () => <IconComponent size={16} />;
-                    IconNode.displayName = `Icon_${state.icon}`;
-                    return buildNodeFromPayload({
-                        name: state.name,
-                        category: state.category,
-                        outputs: flattened,
-                        icon: IconNode,
-                    });
+                    let expr = inputs.expr; // expression comes from wired input
+                    if (expr === undefined) {
+                        throw new Error("No expression connected to input");
+                    }
+                    // If the input is a string that looks like JSON, parse it
+                    if (typeof expr === "string") {
+                        try {
+                            expr = JSON.parse(expr);
+                        } catch {
+                            // keep as string
+                        }
+                    }
+                    const result = await evaluateJSONLang(expr);
+                    setState("lastResult", result);
                 } catch (err: any) {
-                    setStatus(`Build error: ${err.message}`);
-                    return null;
+                    setEvalError(err.message || String(err));
+                    setState("lastResult", null);
+                } finally {
+                    setIsRunning(false);
                 }
             };
 
-            const createAndAdd = () => {
-                const def = buildDef();
-                if (!def) return;
-                NODE_REGISTRY.set(def.name, def);
-                // Force store refresh if needed
-                const store = useGraphStore.getState?.();
-                if (store && 'refreshNodeTypes' in store) {
-                    (store as any).refreshNodeTypes();
-                }
-                addNode(def.name, {
-                    x: 200 + Math.random() * 40,
-                    y: 200 + Math.random() * 40,
-                });
-                setStatus(`Created & added "${def.name}"`);
-            };
-
-            const createOnly = () => {
-                const def = buildDef();
-                if (!def) return;
-                NODE_REGISTRY.set(def.name, def);
-                setStatus(`Registered "${def.name}" — drag from palette`);
-            };
-
-            const copyAST = () => {
-                const def = buildDef();
-                if (!def) return;
-                const payload = {
-                    name: def.name,
-                    category: def.category,
-                    inputs: def.inputs.map(i => ({ id: i.id, name: i.name })),
-                    outputs: def.outputs.map(o => [o.id, o.name, o.template]),
-                };
-                navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-                setStatus("AST copied to clipboard");
-            };
-
-            const astPreview = (() => {
-                const raw = inputs.outputs;
-                const outputsArray = isTuple(raw) ? [raw] : Array.isArray(raw) ? raw : raw ? [raw] : [];
-                const flattened = flattenOutputs(outputsArray);
-                if (flattened.length === 0) return "No outputs wired";
-                return JSON.stringify(flattened.map(([id, name, tpl]) => ({ id, name, template: tpl })), null, 2);
-            })();
-
             return (
-                <div style={{ minWidth: 240 }}>
-                    <L text="Block Name" />
-                    <In value={state.name} onChange={(e) => setState("name", e.target.value)} placeholder="MyBlock" />
-                    <L text="Category" />
-                    <In value={state.category} onChange={(e) => setState("category", e.target.value)} placeholder="Custom" />
-                    <L text="Icon" />
-                    <In value={state.icon} onChange={(e) => setState("icon", e.target.value)} placeholder="Box" />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <L text="Input Expression (AST)" />
+                    <Preview value={inputs.expr} />
 
-                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                        <button onClick={createAndAdd} style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: "none", background: "#6366f1", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Create & Add</button>
-                        <button onClick={createOnly} style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: "1px solid #6366f1", background: "#fff", color: "#6366f1", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Register Only</button>
-                    </div>
-                    <button onClick={copyAST} style={{ width: "100%", marginTop: 6, padding: "6px 0", borderRadius: 6, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#374151", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>Copy Block AST</button>
-
-                    <div style={{ marginTop: 10 }}>
-                        <L text="Preview" />
-                        <pre style={{ margin: 0, padding: 8, background: "#1f2937", color: "#e5e7eb", borderRadius: 6, fontSize: 9, fontFamily: "monospace", maxHeight: 120, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{astPreview}</pre>
-                    </div>
-
-                    {status && (
-                        <div style={{ marginTop: 8, padding: 6, borderRadius: 4, background: status.includes("Error") || status.includes("No") ? "#fef2f2" : "#ecfdf5", color: status.includes("Error") || status.includes("No") ? "#dc2626" : "#059669", fontSize: 11, fontWeight: 600 }}>
-                            {status}
-                        </div>
-                    )}
-                </div>
-            );
-        },
-    },
-
-    /* --- Drag Source (palette item that creates instances) --- */
-    {
-        name: "Drag Block", category: "Meta",
-        inputs: [],
-        outputs: [],
-        controlled: false,
-        defaultState: { name: "NewBlock", category: "Custom", icon: "Box" },
-        icon: () => (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 11l4-7" /><path d="M19 11l-4-7" /><path d="M2 11h20" /><path d="M3.5 11l1.5 9h14l1.5-9" />
-            </svg>
-        ),
-        visual: ({ state, setState }) => {
-            const { addNode } = useGraphStore();
-            const dragRef = useRef<HTMLDivElement>(null);
-
-            const handleDragStart = (e: React.DragEvent) => {
-                const def = buildNodeFromPayload({
-                    name: state.name,
-                    category: state.category,
-                    outputs: [],
-                    icon: () => <Box size={16} />,
-                });
-                NODE_REGISTRY.set(def.name, def);
-                e.dataTransfer.setData("application/json", JSON.stringify({ type: def.name, name: state.name }));
-                e.dataTransfer.effectAllowed = "copy";
-            };
-
-            const handleClick = () => {
-                const def = buildNodeFromPayload({
-                    name: state.name,
-                    category: state.category,
-                    outputs: [],
-                    icon: () => <Box size={16} />,
-                });
-                NODE_REGISTRY.set(def.name, def);
-                addNode(def.name, { x: 300, y: 200 });
-            };
-
-            return (
-                <div style={{ minWidth: 180, padding: 10 }}>
-                    <L text="Block Name" />
-                    <In value={state.name} onChange={(e) => setState("name", e.target.value)} style={{ marginBottom: 6 }} />
-                    <L text="Category" />
-                    <In value={state.category} onChange={(e) => setState("category", e.target.value)} style={{ marginBottom: 6 }} />
-                    <div
-                        ref={dragRef}
-                        draggable
-                        onDragStart={handleDragStart}
-                        onClick={handleClick}
+                    <button
+                        onClick={runExpression}
+                        disabled={isRunning}
                         style={{
-                            padding: "12px 16px", background: "#e0e7ff", borderRadius: 8,
-                            border: "2px dashed #6366f1", textAlign: "center", cursor: "grab",
-                            fontSize: 12, fontWeight: 700, color: "#4338ca", userSelect: "none",
+                            padding: "6px 12px",
+                            background: isRunning ? "#9ca3af" : "#6366f1",
+                            color: "white",
+                            border: "none",
+                            borderRadius: 6,
+                            fontWeight: 600,
+                            cursor: isRunning ? "not-allowed" : "pointer",
+                            fontSize: 12,
                         }}
                     >
-                        🖐 Drag me to canvas<br />
-                        <span style={{ fontSize: 10, color: "#6366f1", fontWeight: 500 }}>or click to place</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 6, textAlign: "center" }}>
-                        Creates: {state.name} ({state.category})
+                        {isRunning ? "Running..." : "▶ Run"}
+                    </button>
+
+                    {evalError && (
+                        <div style={{ color: "#dc2626", fontSize: 11, background: "#fef2f2", padding: 6, borderRadius: 4 }}>
+                            {evalError}
+                        </div>
+                    )}
+
+                    <div>
+                        <L text="Last Result" />
+                        <Preview value={getTemplate("result")} />
                     </div>
                 </div>
             );
         },
-    },
-
-    /* --- Factory examples --- */
-    createNodeFromExprs({
-        name: "Scale", category: "Math",
-        outputs: [["scaled", "Scaled", ["multiply", ["$input", "value A", 1], ["$input", "factor", 1]]]],
-    }),
+    }
 ];
-
-/* ---------- Register all nodes ---------- */
-NODES.forEach((n) => NODE_REGISTRY.set(n.name, n));

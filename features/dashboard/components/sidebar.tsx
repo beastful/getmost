@@ -130,7 +130,7 @@ const data = {
         },
         {
             name: "Хаб",
-            url: "/dashboard/featured",
+            url: "/dashboard/hub",
             icon: (
                 <Box />
             ),

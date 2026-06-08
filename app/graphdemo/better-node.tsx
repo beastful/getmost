@@ -1,4 +1,3 @@
-// features/graph-editor/components/flow-node.tsx
 "use client";
 
 import React, {
@@ -15,8 +14,12 @@ import {
   useStore,
   type NodeProps,
 } from "@xyflow/react";
-import { NODES } from "../lib/data/nodes";
-import { GripVertical } from "lucide-react";
+import {
+  getNode,
+  evaluateOutputs,
+  renderUiAst,
+  resolveIcon,
+} from "./BJLR";
 
 export interface NodeUpdatePayload {
   templates?: Record<string, any>;
@@ -28,53 +31,47 @@ export const NodeUpdateContext = React.createContext<
 >(() => {});
 
 export const FlowNode = ({ id, data, selected }: NodeProps) => {
-  const nodeDef = NODES.find((n) => n.name === data.nodeType);
-  if (!nodeDef) return null;
-
+  const nodeDef = getNode(data.nodeType);
   const updateNodeData = useContext(NodeUpdateContext);
 
+  if (!nodeDef) return null;
+
   const [state, setLocalState] = useState(() => ({
-    ...nodeDef.defaultState,
+    ...nodeDef.state,
     ...(data.state || {}),
   }));
 
-  // Subscribe to incoming edge values
   const rawInputs = useStore((store: any) => {
     const result: Record<string, any> = {};
     const edges = store.edges || [];
+
     for (const input of nodeDef.inputs) {
       const edge = edges.find(
         (e: any) => e.target === id && e.targetHandle === input.id
       );
+
       if (edge) {
         const src = store.nodeLookup?.get?.(edge.source);
-        result[input.id] = src?.data?.templates?.[edge.sourceHandle!];
+        result[input.id] = src?.data?.templates?.[edge.sourceHandle];
       }
     }
+
     return result;
   });
 
   const inputs = useMemo(() => rawInputs, [JSON.stringify(rawInputs)]);
 
-  // Compute templates – functions are evaluated, arrays are left as-is (no $input substitution)
-  const templates = useMemo(() => {
-    const result: Record<string, any> = {};
-    for (const output of nodeDef.outputs) {
-      let val = output.template;
+  const setState = useCallback((key: string, val: any) => {
+    setLocalState((prev) => ({ ...prev, [key]: val }));
+  }, []);
 
-      if (typeof val === "function") {
-        try {
-          val = val(inputs, state);
-        } catch {
-          val = null;
-        }
-      }
-      // Arrays are stored as raw AST (no substitution)
-      // Primitives are passed through
-      result[output.id] = val;
-    }
-    return result;
-  }, [inputs, state, nodeDef.outputs]);
+  const templates = useMemo(() => {
+    return evaluateOutputs(nodeDef, {
+      state,
+      inputs,
+      templates: {},
+    });
+  }, [nodeDef, state, inputs]);
 
   const didMount = useRef(false);
   useEffect(() => {
@@ -82,34 +79,37 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
       didMount.current = true;
       return;
     }
+
     if (
       JSON.stringify(data.templates) === JSON.stringify(templates) &&
       JSON.stringify(data.state) === JSON.stringify(state)
     ) {
       return;
     }
+
     updateNodeData(id, { templates, state });
   }, [templates, state, id, updateNodeData, data.templates, data.state]);
 
-  const setState = useCallback(
-    (key: string, val: any) =>
-      setLocalState((prev) => ({ ...prev, [key]: val })),
-    []
+  const Icon = resolveIcon(nodeDef.icon);
+
+  const runtimeCtx = useMemo(
+    () => ({
+      state,
+      inputs,
+      templates,
+      setState,
+    }),
+    [state, inputs, templates, setState]
   );
 
-  const getTemplate = useCallback(
-    (outputId: string) => templates[outputId],
-    [templates]
+  const body = nodeDef.ui ? (
+    <div className="nodrag nowheel" onPointerDown={(e) => e.stopPropagation()}>
+      {renderUiAst(nodeDef.ui, runtimeCtx)}
+    </div>
+  ) : (
+    <div className="text-xs text-slate-500">No UI</div>
   );
 
-  const getInputTemplate = useCallback(
-    (inputId: string) => inputs[inputId],
-    [inputs]
-  );
-
-  const Visual = useMemo(() => React.memo(nodeDef.visual), [nodeDef.visual]);
-
-  // Uncontrolled (free‑form) nodes
   if (nodeDef.controlled === false) {
     return (
       <div
@@ -123,39 +123,6 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
           boxShadow: "none",
         }}
       >
-        <div
-          className="absolute top-0 left-0 right-0 z-20 flex items-center justify-center duration-150 pointer-events-none"
-          style={{
-            height: 18,
-            marginTop: -9,
-            cursor: "grab",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              padding: "2px 10px",
-              background: "rgba(15, 23, 42, 0.75)",
-              borderRadius: 99,
-              backdropFilter: "blur(4px)",
-            }}
-          >
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: "50%",
-                  background: "#e2e8f0",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
         {nodeDef.inputs.map((input) => (
           <Handle
             key={input.id}
@@ -173,8 +140,6 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
               border: "2px solid #ffffff",
               borderRadius: "50%",
               zIndex: 10,
-              cursor: "crosshair",
-              opacity: 0.6,
             }}
           />
         ))}
@@ -196,47 +161,36 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
               border: "2px solid #ffffff",
               borderRadius: "50%",
               zIndex: 10,
-              cursor: "crosshair",
-              opacity: 0.6,
             }}
           />
         ))}
 
-        <div className="nodrag nowheel" onPointerDown={(e) => e.stopPropagation()}>
-          <Visual
-            state={state}
-            setState={setState}
-            inputs={inputs}
-            getTemplate={getTemplate}
-            getInputTemplate={getInputTemplate}
-          />
-        </div>
+        {body}
       </div>
     );
   }
 
-  // Standard card‑style nodes
   return (
     <div
-      className={`bg-white border-2 rounded-xl shadow-sm transition-all flex flex-col ${
-        selected ? "border-indigo-400 shadow-md" : "border-gray-200"
+      className={`flex flex-col rounded-xl border-2 bg-white shadow-sm transition-all ${
+        selected ? "border-indigo-400 shadow-md" : "border-slate-200"
       }`}
       style={{ width: nodeDef.width || 260 }}
     >
-      <div className="h-[40px] px-3 border-b-2 border-gray-100 flex items-center justify-between shrink-0">
+      <div className="flex h-10 items-center justify-between border-b-2 border-slate-100 px-3 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 flex items-center justify-center text-gray-500">
-            <nodeDef.icon />
+          <div className="flex h-5 w-5 items-center justify-center text-slate-500">
+            <Icon size={16} />
           </div>
-          <span className="font-semibold text-sm text-gray-700">{nodeDef.name}</span>
+          <span className="text-sm font-semibold text-slate-700">{nodeDef.name}</span>
         </div>
       </div>
 
       {(nodeDef.inputs.length > 0 || nodeDef.outputs.length > 0) && (
-        <div className="relative px-3 py-2.5 flex justify-between gap-2 border-b border-gray-100 shrink-0">
-          <div className="flex flex-col gap-1.5 items-start min-w-0">
+        <div className="relative flex justify-between gap-2 border-b border-slate-100 px-3 py-2.5 shrink-0">
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
             {nodeDef.inputs.map((input) => (
-              <div key={input.id} className="relative flex items-center h-5">
+              <div key={input.id} className="relative flex h-5 items-center">
                 <Handle
                   type="target"
                   position={Position.Left}
@@ -252,20 +206,19 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
                     border: "2px solid #ffffff",
                     borderRadius: "50%",
                     zIndex: 10,
-                    cursor: "crosshair",
                   }}
                 />
-                <div className="inline-flex items-center bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                <div className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
                   {input.name}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-col gap-1.5 items-end min-w-0">
+          <div className="flex min-w-0 flex-col items-end gap-1.5">
             {nodeDef.outputs.map((output) => (
-              <div key={output.id} className="relative flex items-center h-5 justify-end">
-                <div className="inline-flex items-center bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+              <div key={output.id} className="relative flex h-5 items-center justify-end">
+                <div className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                   {output.name}
                 </div>
                 <Handle
@@ -283,7 +236,6 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
                     border: "2px solid #ffffff",
                     borderRadius: "50%",
                     zIndex: 10,
-                    cursor: "crosshair",
                   }}
                 />
               </div>
@@ -293,17 +245,10 @@ export const FlowNode = ({ id, data, selected }: NodeProps) => {
       )}
 
       <div
-        className="nodrag nowheel"
+        className="nodrag nowheel p-2.5"
         onPointerDown={(e) => e.stopPropagation()}
-        style={{ padding: 10 }}
       >
-        <Visual
-          state={state}
-          setState={setState}
-          inputs={inputs}
-          getTemplate={getTemplate}
-          getInputTemplate={getInputTemplate}
-        />
+        {body}
       </div>
     </div>
   );

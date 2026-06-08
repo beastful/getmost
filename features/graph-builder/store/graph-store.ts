@@ -1,131 +1,221 @@
 import { createEntity } from '@/features/project/api/create-entity';
 import { deleteEntity } from '@/features/project/api/delete-entity';
 import { listEntities } from '@/features/project/api/list-entities';
-import { readEntity } from '@/features/project/api/read-entity'
-import { updateEntity } from '@/features/project/api/update-entity'
+import { readEntity } from '@/features/project/api/read-entity';
+import { updateEntity } from '@/features/project/api/update-entity';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { realtime } from '@/lib/appwrite';
-import type { RealtimeSubscription } from 'appwrite';
+import * as Y from 'yjs';
+import { HocuspocusProvider } from '@hocuspocus/provider';
 import type { Entity } from '../types/types';
 import type { CreateEntityData, UpdateEntityData } from '@/features/project/types/types';
+import deepEqual from 'fast-deep-equal';
 
-const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
+// ====================== TYPES ======================
+export interface FlowNode {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: Record<string, any>;
+  selected?: boolean;
+}
 
-// ── Черновик конкретной сущности ──
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  animated?: boolean;
+}
+
+export interface UserAwareness {
+  name: string;
+  color: string;
+  cursor: { x: number; y: number } | null;
+}
+
 interface Draft {
   entity: Entity;
-  graphString: string;
-  originalGraphString: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
   isDirty: boolean;
   isSaving: boolean;
   saveError: string | null;
   lastSavedAt: number | null;
+  isCollaborative: boolean;
+  isSynced: boolean;
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+  connectionError?: string;
 }
 
-// ── Состояние списка ──
-interface ListState {
-  entities: Entity[];
-  total: number;
-  isLoading: boolean;
-  listError: string | null;
+interface CollabSession {
+  ydoc: Y.Doc;
+  provider: HocuspocusProvider;
+  unobserveNodes: () => void;
+  unobserveEdges: () => void;
+  unsubscribeAwareness: () => void;
 }
 
-// ── Состояние редактора ──
-interface EditorState {
-  activeEntityId: string | null;        // текущий файл
-  drafts: Record<string, Draft>;        // все открытые/изменённые файлы
-}
+// ====================== HELPERS ======================
+const HOCUSPOCUS_URL = "wss://ws.getmost.app";
 
-interface GraphStore extends ListState, EditorState {
-  // ── Список ──
-  loadEntities: (params?: {
-    workspaceId?: string;
-    search?: string;
-    limit?: number;
-    offset?: number;
-  }) => Promise<void>;
+const COLLAB_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
 
-  // ── Навигация между файлами ──
-  openEntity: (entity: Entity) => void;
-  switchEntity: (entityId: string) => Promise<void>;
-  closeEntity: (entityId?: string) => void;
+const getRandomColor = (): string => COLLAB_COLORS[Math.floor(Math.random() * COLLAB_COLORS.length)];
+const generateUserName = (): string => `User ${Math.floor(Math.random() * 10000)}${Date.now()}`;
 
-  // ── Редактирование текущего ──
-  updateGraphString: (newString: string) => void;
-  addNode: (nodeType: string, position?: { x: number; y: number }) => void;
-  saveGraph: () => Promise<void>;
-  updateEntityField: <K extends keyof Entity>(field: K, value: Entity[K]) => Promise<void>;
+const yMapToArray = <T>(map: Y.Map<T>): T[] => Array.from(map.values());
 
-  // ── CRUD ──
-  createNewEntity: (data: CreateEntityData) => Promise<Entity>;
-  deleteEntity: (entityId: string) => Promise<void>;
-  renameEntity: (entityId: string, name: string) => Promise<void>;
+const fastEqual = <T>(a: T[], b: T[]): boolean => deepEqual(a, b);
 
-  // ── Селекторы (через get) ──
-  currentEntity: () => Entity | null;
-  currentDraft: () => Draft | null;
-  currentGraphString: () => string;
-  currentIsDirty: () => boolean;
-  currentIsSaving: () => boolean;
+// Global collab sessions (kept for simplicity)
+const collabSessions = new Map<string, CollabSession>();
 
-  // ── Сброс при смене рабочей области ──
-  resetWorkspace: () => void;
+const getCollabSession = (entityId: string) => collabSessions.get(entityId);
 
-  // ── Realtime ──
-  _applyRemoteUpdate: (remote: Entity) => void;
-}
+const removeCollabSession = (entityId: string) => {
+  const session = collabSessions.get(entityId);
+  if (!session) return;
+  session.unobserveNodes?.();
+  session.unobserveEdges?.();
+  session.unsubscribeAwareness?.();
+  session.provider.destroy();
+  session.ydoc.destroy();
+  collabSessions.delete(entityId);
+};
 
-// ── Realtime (module-level, не сериализуется) ──
-let activeSubscription: RealtimeSubscription | null = null;
-let subscribedEntityId: string | null = null;
+const removeAllCollabSessions = () => {
+  Array.from(collabSessions.keys()).forEach(removeCollabSession);
+};
 
-function subscribeToRealtime(entityId: string, store: GraphStore) {
-  if (subscribedEntityId === entityId) return;
+// ====================== COLLAB HELPERS ======================
+const initCollabSession = (
+  entityId: string,
+  initialDraft: Draft,
+  currentUser: UserAwareness,
+  set: any,
+  get: any
+) => {
+  removeCollabSession(entityId);
 
-  activeSubscription?.unsubscribe();
-  subscribedEntityId = entityId;
+  const ydoc = new Y.Doc();
+  const yNodes = ydoc.getMap<FlowNode>('nodes');
+  const yEdges = ydoc.getMap<FlowEdge>('edges');
 
-  const channel = `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents.${entityId}`;
-
-  realtime.subscribe(channel, (response) => {
-    if (response.events.includes('databases.*.collections.*.documents.*.update')) {
-      store._applyRemoteUpdate(response.payload as unknown as Entity);
-    }
-  }).then((sub) => {
-    if (subscribedEntityId === entityId) {
-      activeSubscription = sub;
-    } else {
-      sub.unsubscribe(); // race condition: уже переключились
-    }
+  const provider = new HocuspocusProvider({
+    url: HOCUSPOCUS_URL,
+    name: `entity-${entityId}`,
+    document: ydoc,
   });
-}
 
-function unsubscribeRealtime() {
-  activeSubscription?.unsubscribe();
-  activeSubscription = null;
-  subscribedEntityId = null;
-}
+  let initialSyncDone = false;
 
+  const handleStatus = (event: any) => {
+    set((state: any) => {
+      const d = state.drafts[entityId];
+      if (!d) return state;
+      return { drafts: { ...state.drafts, [entityId]: { ...d, connectionStatus: event.status } } };
+    });
+  };
+
+  const handleError = (err: any) => {
+    console.error('Hocuspocus error:', err);
+    set((state: any) => {
+      const d = state.drafts[entityId];
+      if (!d) return state;
+      return { drafts: { ...state.drafts, [entityId]: { ...d, connectionStatus: 'error', connectionError: String(err) } } };
+    });
+  };
+
+  const handleSynced = () => {
+    if (initialSyncDone) return;
+    initialSyncDone = true;
+
+    const currentDraft = get().drafts[entityId];
+    if (!currentDraft) return;
+
+    const isEmpty = yNodes.size === 0 && yEdges.size === 0;
+
+    if (isEmpty && (currentDraft.nodes.length || currentDraft.edges.length)) {
+      ydoc.transact(() => {
+        currentDraft.nodes.forEach((n) => yNodes.set(n.id, n));
+        currentDraft.edges.forEach((e) => yEdges.set(e.id, e));
+      });
+    } else if (!isEmpty) {
+      set((state: any) => ({
+        drafts: {
+          ...state.drafts,
+          [entityId]: {
+            ...state.drafts[entityId]!,
+            nodes: yMapToArray(yNodes),
+            edges: yMapToArray(yEdges),
+            isDirty: false,
+          },
+        },
+      }));
+    }
+
+    set((state: any) => ({
+      drafts: { ...state.drafts, [entityId]: { ...state.drafts[entityId]!, isSynced: true } },
+    }));
+  };
+
+  const updateFromYjs = () => {
+    const newNodes = yMapToArray(yNodes);
+    const newEdges = yMapToArray(yEdges);
+
+    set((state: any) => {
+      const d = state.drafts[entityId];
+      if (!d) return state;
+      if (fastEqual(d.nodes, newNodes) && fastEqual(d.edges, newEdges)) return state;
+      return { drafts: { ...state.drafts, [entityId]: { ...d, nodes: newNodes, edges: newEdges } } };
+    });
+  };
+
+  provider.on('status', handleStatus);
+  provider.on('error', handleError);
+  provider.on('synced', handleSynced);
+
+  yNodes.observe(updateFromYjs);
+  yEdges.observe(updateFromYjs);
+
+  provider.awareness.setLocalStateField('user', currentUser);
+
+  const updateAwareness = () => {
+    const awarenessUsers = Array.from(provider.awareness.getStates().values())
+      .map((s: any) => s?.user)
+      .filter(Boolean);
+    set({ awarenessUsers });
+  };
+
+  provider.awareness.on('change', updateAwareness);
+  updateAwareness();
+
+  collabSessions.set(entityId, {
+    ydoc,
+    provider,
+    unobserveNodes: () => yNodes.unobserve(updateFromYjs),
+    unobserveEdges: () => yEdges.unobserve(updateFromYjs),
+    unsubscribeAwareness: () => provider.awareness.off('change', updateAwareness),
+  });
+
+  return { yNodes, yEdges };
+};
+
+// ====================== STORE ======================
 export const useGraphStore = create<GraphStore>()(
   devtools((set, get) => ({
-    // ═══════════════════════════════════════
-    // НАЧАЛЬНОЕ СОСТОЯНИЕ
-    // ═══════════════════════════════════════
-
+    // State
     entities: [],
     total: 0,
     isLoading: false,
     listError: null,
-
     activeEntityId: null,
     drafts: {},
+    awarenessUsers: [],
+    currentUser: { name: generateUserName(), color: getRandomColor(), cursor: null },
+    _cursorThrottleTimers: {} as Record<string, NodeJS.Timeout | null>,
 
-    // ═══════════════════════════════════════
-    // СЕЛЕКТОРЫ (computed, не храним в state)
-    // ═══════════════════════════════════════
-
+    // Selectors
     currentEntity: () => {
       const { activeEntityId, drafts } = get();
       return activeEntityId ? drafts[activeEntityId]?.entity ?? null : null;
@@ -136,42 +226,190 @@ export const useGraphStore = create<GraphStore>()(
       return activeEntityId ? drafts[activeEntityId] ?? null : null;
     },
 
-    currentGraphString: () => {
-      return get().currentDraft()?.graphString ?? '';
+    currentNodes: () => get().currentDraft()?.nodes ?? [],
+    currentEdges: () => get().currentDraft()?.edges ?? [],
+
+    // User & Awareness
+    setCurrentUser: (user) => {
+      set((state) => ({ currentUser: { ...state.currentUser, ...user } }));
+      const activeId = get().activeEntityId;
+      if (activeId) {
+        getCollabSession(activeId)?.provider.awareness.setLocalStateField('user', {
+          ...get().currentUser,
+          ...user,
+        });
+      }
     },
 
-    currentIsDirty: () => {
-      return get().currentDraft()?.isDirty ?? false;
-    },
+    _updateAwarenessUsers: (users) => set({ awarenessUsers: users }),
 
-    currentIsSaving: () => {
-      return get().currentDraft()?.isSaving ?? false;
-    },
-
-    // ═══════════════════════════════════════
-    // СПИСОК
-    // ═══════════════════════════════════════
-
+    // Entities CRUD
     loadEntities: async (params = {}) => {
       set({ isLoading: true, listError: null });
       try {
         const result = await listEntities(params);
-        set({
-          entities: result.entities,
-          total: result.total,
-          isLoading: false,
-        });
+        set({ entities: result.entities, total: result.total, isLoading: false });
       } catch (err) {
         set({ listError: String(err), isLoading: false });
       }
     },
 
-    // ═══════════════════════════════════════
-    // СБРОС ПРИ СМЕНЕ РАБОЧЕЙ ОБЛАСТИ
-    // ═══════════════════════════════════════
+    createNewEntity: async (data) => {
+      const entity = await createEntity(data);
+      set((state) => ({ entities: [entity, ...state.entities], total: state.total + 1 }));
+      return entity;
+    },
+
+    deleteEntity: async (entityId) => {
+      await deleteEntity(entityId);
+      removeCollabSession(entityId);
+
+      set((state) => {
+        const newDrafts = { ...state.drafts };
+        delete newDrafts[entityId];
+        const timers = { ...state._cursorThrottleTimers };
+        if (timers[entityId]) {
+          clearTimeout(timers[entityId]!);
+          delete timers[entityId];
+        }
+
+        return {
+          entities: state.entities.filter((e) => e.$id !== entityId),
+          total: state.total - 1,
+          drafts: newDrafts,
+          activeEntityId: state.activeEntityId === entityId ? null : state.activeEntityId,
+          awarenessUsers: state.activeEntityId === entityId ? [] : state.awarenessUsers,
+          _cursorThrottleTimers: timers,
+        };
+      });
+    },
+
+    renameEntity: async (entityId, name) => {
+      const updated = await updateEntity(entityId, { name });
+      set((state) => {
+        const newDrafts = { ...state.drafts };
+        if (newDrafts[entityId]) {
+          newDrafts[entityId] = {
+            ...newDrafts[entityId],
+            entity: { ...newDrafts[entityId].entity, name, $updatedAt: updated.$updatedAt },
+          };
+        }
+        return {
+          drafts: newDrafts,
+          entities: state.entities.map((e) =>
+            e.$id === entityId ? { ...e, name, $updatedAt: updated.$updatedAt } : e
+          ),
+        };
+      });
+    },
+
+    updateEntityField: async <K extends keyof Entity>(field: K, value: Entity[K]) => {
+      const { activeEntityId, drafts } = get();
+      if (!activeEntityId) return;
+      const draft = drafts[activeEntityId];
+
+      set((state) => ({
+        drafts: { ...state.drafts, [activeEntityId]: { ...state.drafts[activeEntityId]!, isSaving: true, saveError: null } },
+      }));
+
+      try {
+        const updated = await updateEntity(activeEntityId, { [field]: value } as UpdateEntityData);
+        set((state) => ({
+          drafts: {
+            ...state.drafts,
+            [activeEntityId]: { ...state.drafts[activeEntityId]!, entity: { ...draft.entity, ...updated, [field]: value }, isSaving: false },
+          },
+          entities: state.entities.map((e) => (e.$id === updated.$id ? updated : e)),
+        }));
+      } catch (err) {
+        set((state) => ({
+          drafts: { ...state.drafts, [activeEntityId]: { ...state.drafts[activeEntityId]!, isSaving: false, saveError: String(err) } },
+        }));
+        throw err;
+      }
+    },
+
+    // Core Graph Operations
+    openEntity: (entity) => {
+      // Safety: ensure any stale collaboration session for this entity is gone
+      get().disableCollaboration(entity.$id);
+
+      let nodes: FlowNode[] = [];
+      let edges: FlowEdge[] = [];
+      try {
+        const parsed = typeof entity.data === 'string' ? JSON.parse(entity.data) : entity.data;
+        nodes = parsed.nodes || [];
+        edges = parsed.edges || [];
+      } catch (e) {
+        console.error('Failed to parse entity data', e);
+      }
+
+      const newDraft: Draft = {
+        entity,
+        nodes,
+        edges,
+        isDirty: false,
+        isSaving: false,
+        saveError: null,
+        lastSavedAt: Date.now(),
+        isCollaborative: false,
+        isSynced: false,
+        connectionStatus: 'disconnected',
+      };
+
+      set((state) => ({
+        activeEntityId: entity.$id,
+        drafts: { ...state.drafts, [entity.$id]: newDraft },
+        entities: state.entities.map((e) => (e.$id === entity.$id ? entity : e)),
+      }));
+    },
+
+    switchEntity: async (entityId) => {
+      const currentId = get().activeEntityId;
+      // Disable collaboration on the previously active entity
+      if (currentId && currentId !== entityId) {
+        get().disableCollaboration(currentId);
+      }
+
+      if (get().drafts[entityId]) {
+        set({ activeEntityId: entityId });
+        return;
+      }
+      try {
+        const entity = await readEntity(entityId);
+        get().openEntity(entity);
+      } catch (err) {
+        set({ listError: String(err) });
+      }
+    },
+
+    closeEntity: (entityId) => {
+      const { activeEntityId } = get();
+      const targetId = entityId ?? activeEntityId;
+      if (!targetId) return;
+
+      removeCollabSession(targetId);
+
+      set((state) => {
+        const newDrafts = { ...state.drafts };
+        delete newDrafts[targetId];
+        const timers = { ...state._cursorThrottleTimers };
+        if (timers[targetId]) {
+          clearTimeout(timers[targetId]!);
+          delete timers[targetId];
+        }
+
+        return {
+          drafts: newDrafts,
+          activeEntityId: activeEntityId === targetId ? null : activeEntityId,
+          awarenessUsers: activeEntityId === targetId ? [] : state.awarenessUsers,
+          _cursorThrottleTimers: timers,
+        };
+      });
+    },
 
     resetWorkspace: () => {
-      unsubscribeRealtime();
+      removeAllCollabSessions();
       set({
         activeEntityId: null,
         drafts: {},
@@ -179,345 +417,194 @@ export const useGraphStore = create<GraphStore>()(
         total: 0,
         listError: null,
         isLoading: false,
+        awarenessUsers: [],
+        _cursorThrottleTimers: {},
       });
     },
 
-    // ═══════════════════════════════════════
-    // НАВИГАЦИЯ МЕЖДУ ФАЙЛАМИ
-    // ═══════════════════════════════════════
-
-    openEntity: (entity) => {
-      const { drafts, activeEntityId } = get();
-
-      // 1. Отписываемся от старой сущности
-      if (activeEntityId && activeEntityId !== entity.$id) {
-        // Старая остаётся в drafts — изменения не теряются
-      }
-
-      // 2. Создаём черновик, если ещё нет
-      const existingDraft = drafts[entity.$id];
-      const newDrafts = { ...drafts };
-
-      if (!existingDraft) {
-        newDrafts[entity.$id] = {
-          entity,
-          graphString: entity.data,
-          originalGraphString: entity.data,
-          isDirty: false,
-          isSaving: false,
-          saveError: null,
-          lastSavedAt: Date.now(),
-        };
-      }
-
-      // 3. Обновляем список (метаданные могли измениться)
-      set((state) => ({
-        activeEntityId: entity.$id,
-        drafts: newDrafts,
-        entities: state.entities.map((e) =>
-          e.$id === entity.$id ? entity : e
-        ),
-      }));
-
-      // 4. Подписываемся на realtime
-      subscribeToRealtime(entity.$id, get());
-    },
-
-    switchEntity: async (entityId) => {
-      const { drafts, openEntity } = get();
-
-      // Если черновик уже есть — просто переключаемся
-      if (drafts[entityId]) {
-        set({ activeEntityId: entityId });
-        subscribeToRealtime(entityId, get());
-        return;
-      }
-
-      // Иначе загружаем с сервера
-      try {
-        const entity = await readEntity(entityId);
-        openEntity(entity);
-      } catch (err) {
-        set({ listError: String(err) });
-      }
-    },
-
-    closeEntity: (entityId) => {
-      const { activeEntityId, drafts } = get();
-      const targetId = entityId ?? activeEntityId;
-      if (!targetId) return;
-
-      const newDrafts = { ...drafts };
-      const draft = newDrafts[targetId];
-
-      // Если чистый — удаляем из памяти
-      if (draft && !draft.isDirty) {
-        delete newDrafts[targetId];
-      }
-
-      // Если закрываем текущий — сбрасываем activeEntityId
-      const newActiveId = activeEntityId === targetId ? null : activeEntityId;
-
-      if (newActiveId === null) {
-        unsubscribeRealtime();
-      }
-
-      set({
-        drafts: newDrafts,
-        activeEntityId: newActiveId,
-      });
-    },
-
-    // ═══════════════════════════════════════
-    // РЕДАКТИРОВАНИЕ
-    // ═══════════════════════════════════════
-
-    updateGraphString: (newString) => {
+    // Nodes & Edges
+    setNodes: (nodes) => {
       const { activeEntityId, drafts } = get();
       if (!activeEntityId) return;
-
       const draft = drafts[activeEntityId];
       if (!draft) return;
 
-      const newDrafts = {
-        ...drafts,
-        [activeEntityId]: {
-          ...draft,
-          graphString: newString,
-          isDirty: newString !== draft.originalGraphString,
-        },
-      };
+      if (draft.isCollaborative) {
+        const session = getCollabSession(activeEntityId);
+        if (session) {
+          const yNodes = session.ydoc.getMap<FlowNode>('nodes');
+          session.ydoc.transact(() => {
+            const currentIds = new Set(nodes.map((n) => n.id));
+            yNodes.forEach((_, key) => { if (!currentIds.has(key)) yNodes.delete(key); });
 
-      set({ drafts: newDrafts });
-    },
-
-    addNode: (nodeType, position = { x: 100, y: 100 }) => {
-      const { currentGraphString, updateGraphString } = get();
-      let graph = { nodes: [], edges: [] };
-      try {
-        graph = JSON.parse(currentGraphString() || '{}');
-        if (!graph.nodes) graph.nodes = [];
-        if (!graph.edges) graph.edges = [];
-      } catch {
-        // пустой граф
+            nodes.forEach((node) => {
+              const { selected, ...cleanNode } = node;
+              yNodes.set(node.id, cleanNode);
+            });
+          });
+        }
       }
 
-      const newNode = {
-        id: `${nodeType}-${Date.now()}`,
-        type: 'flowNode',
-        position,
-        data: { nodeType, state: {} },
-      };
-      graph.nodes.push(newNode);
-      updateGraphString(JSON.stringify(graph));
+      // Always update local state (selection stays local)
+      set((state) => ({
+        drafts: {
+          ...state.drafts,
+          [activeEntityId]: {
+            ...state.drafts[activeEntityId]!,
+            nodes,
+            isDirty: !draft.isCollaborative,
+          },
+        },
+      }));
     },
 
-    // ═══════════════════════════════════════
-    // СОХРАНЕНИЕ
-    // ═══════════════════════════════════════
+    setEdges: (edges) => {
+      const { activeEntityId, drafts } = get();
+      if (!activeEntityId) return;
+      const draft = drafts[activeEntityId];
+      if (!draft) return;
+
+      if (draft.isCollaborative) {
+        const session = getCollabSession(activeEntityId);
+        if (session) {
+          const yEdges = session.ydoc.getMap<FlowEdge>('edges');
+          session.ydoc.transact(() => {
+            const currentIds = new Set(edges.map((e) => e.id));
+            yEdges.forEach((_, key) => { if (!currentIds.has(key)) yEdges.delete(key); });
+
+            // Strip local-only React Flow state before syncing
+            edges.forEach((edge) => {
+              const { selected, ...cleanEdge } = edge;
+              yEdges.set(edge.id, cleanEdge);
+            });
+          });
+        }
+      }
+
+      set((state) => ({
+        drafts: {
+          ...state.drafts,
+          [activeEntityId]: {
+            ...state.drafts[activeEntityId]!,
+            edges,
+            isDirty: !draft.isCollaborative,
+          },
+        },
+      }));
+    },
 
     saveGraph: async () => {
       const { activeEntityId, drafts } = get();
       if (!activeEntityId) return;
-
       const draft = drafts[activeEntityId];
-      if (!draft || !draft.isDirty) return;
+      if (!draft) return;
 
-      // Помечаем сохраняющимся
-      set({
-        drafts: {
-          ...drafts,
-          [activeEntityId]: { ...draft, isSaving: true, saveError: null },
-        },
-      });
+      set((state) => ({
+        drafts: { ...state.drafts, [activeEntityId]: { ...state.drafts[activeEntityId]!, isSaving: true, saveError: null } },
+      }));
 
       try {
-        const updated = await updateEntity(activeEntityId, {
-          data: draft.graphString,
-        });
+        let nodesToSave = draft.nodes;
+        let edgesToSave = draft.edges;
 
-        const savedDraft: Draft = {
-          ...draft,
-          entity: updated,
-          graphString: updated.data,
-          originalGraphString: updated.data,
-          isDirty: false,
-          isSaving: false,
-          lastSavedAt: Date.now(),
-        };
+        if (draft.isCollaborative) {
+          const session = getCollabSession(activeEntityId);
+          if (session) {
+            nodesToSave = yMapToArray(session.ydoc.getMap<FlowNode>('nodes'));
+            edgesToSave = yMapToArray(session.ydoc.getMap<FlowEdge>('edges'));
+          }
+        }
 
-        set({
-          drafts: { ...drafts, [activeEntityId]: savedDraft },
-          entities: get().entities.map((e) =>
-            e.$id === updated.$id ? updated : e
-          ),
-        });
-      } catch (err) {
-        set({
+        const dataToSave = JSON.stringify({ nodes: nodesToSave, edges: edgesToSave });
+        const updated = await updateEntity(activeEntityId, { data: dataToSave });
+
+        set((state) => ({
           drafts: {
-            ...drafts,
-            [activeEntityId]: {
-              ...draft,
-              isSaving: false,
-              saveError: String(err),
-            },
+            ...state.drafts,
+            [activeEntityId]: { ...state.drafts[activeEntityId]!, entity: updated, isDirty: false, isSaving: false, lastSavedAt: Date.now() },
           },
-        });
+          entities: state.entities.map((e) => (e.$id === updated.$id ? updated : e)),
+        }));
+      } catch (err) {
+        set((state) => ({
+          drafts: { ...state.drafts, [activeEntityId]: { ...state.drafts[activeEntityId]!, isSaving: false, saveError: String(err) } },
+        }));
         throw err;
       }
     },
 
-    updateEntityField: async (field, value) => {
-      const { activeEntityId, drafts } = get();
+    // Collaboration
+    enableCollaboration: (entityId) => {
+      const { drafts, currentUser } = get();
+      const draft = drafts[entityId];
+      if (!draft || draft.isCollaborative) return;
+
+      initCollabSession(entityId, draft, currentUser, set, get);
+
+      set((state) => ({
+        drafts: { ...state.drafts, [entityId]: { ...draft, isCollaborative: true, connectionStatus: 'connecting' } },
+      }));
+    },
+
+    disableCollaboration: (entityId) => {
+      // Clear the cursor throttle timer for this entity
+      set((state) => {
+        const timers = { ...state._cursorThrottleTimers };
+        if (timers[entityId]) {
+          clearTimeout(timers[entityId]!);
+          delete timers[entityId];
+        }
+        return { _cursorThrottleTimers: timers };
+      });
+
+      removeCollabSession(entityId);
+      set((state) => ({
+        drafts: {
+          ...state.drafts,
+          [entityId]: {
+            ...state.drafts[entityId]!,
+            isCollaborative: false,
+            isSynced: false,
+            connectionStatus: 'disconnected',
+            connectionError: undefined,
+          },
+        },
+        awarenessUsers: [],
+      }));
+    },
+
+    currentIsDirty: () => get().currentDraft()?.isDirty ?? false,
+    currentIsSaving: () => get().currentDraft()?.isSaving ?? false,
+
+    updateCursorPosition: (position) => {
+      const { activeEntityId, currentUser, _cursorThrottleTimers } = get();
       if (!activeEntityId) return;
 
-      const draft = drafts[activeEntityId];
-      if (!draft) return;
+      const updatedUser = { ...currentUser, cursor: position };
+      set({ currentUser: updatedUser });
 
-      set({
-        drafts: {
-          ...drafts,
-          [activeEntityId]: { ...draft, isSaving: true, saveError: null },
-        },
-      });
+      const session = getCollabSession(activeEntityId);
+      if (!session) return;
+      if (_cursorThrottleTimers[activeEntityId]) return;
 
-      try {
-        const updated = await updateEntity(activeEntityId, {
-          [field]: value,
-        } as UpdateEntityData);
+      const timer = setTimeout(() => {
+        getCollabSession(activeEntityId)?.provider.awareness.setLocalStateField('user', get().currentUser);
+        set((s) => ({
+          _cursorThrottleTimers: { ...s._cursorThrottleTimers, [activeEntityId]: null },
+        }));
+      }, 40);
 
-        const newDraft: Draft = {
-          ...draft,
-          entity: { ...draft.entity, ...updated, [field]: value },
-          isSaving: false,
-          lastSavedAt: Date.now(),
-        };
-
-        set({
-          drafts: { ...drafts, [activeEntityId]: newDraft },
-          entities: get().entities.map((e) =>
-            e.$id === updated.$id ? updated : e
-          ),
-        });
-      } catch (err) {
-        set({
-          drafts: {
-            ...drafts,
-            [activeEntityId]: { ...draft, isSaving: false, saveError: String(err) },
-          },
-        });
-        throw err;
-      }
-    },
-
-    // ═══════════════════════════════════════
-    // CRUD
-    // ═══════════════════════════════════════
-
-    createNewEntity: async (data) => {
-      const entity = await createEntity(data);
-      set((state) => ({
-        entities: [entity, ...state.entities],
-        total: state.total + 1,
+      set((s) => ({
+        _cursorThrottleTimers: { ...s._cursorThrottleTimers, [activeEntityId]: timer },
       }));
-      return entity;
-    },
-
-    deleteEntity: async (entityId) => {
-      await deleteEntity(entityId);
-      const { activeEntityId, drafts, closeEntity } = get();
-
-      const newDrafts = { ...drafts };
-      delete newDrafts[entityId];
-
-      set((state) => ({
-        entities: state.entities.filter((e) => e.$id !== entityId),
-        total: state.total - 1,
-        drafts: newDrafts,
-        activeEntityId: activeEntityId === entityId ? null : activeEntityId,
-      }));
-
-      if (activeEntityId === entityId) {
-        unsubscribeRealtime();
-      }
-    },
-
-    renameEntity: async (entityId, name) => {
-      const updated = await updateEntity(entityId, { name });
-      const { drafts, activeEntityId } = get();
-
-      const newDrafts = { ...drafts };
-      if (newDrafts[entityId]) {
-        newDrafts[entityId] = {
-          ...newDrafts[entityId],
-          entity: { ...newDrafts[entityId].entity, name, $updatedAt: updated.$updatedAt },
-        };
-      }
-
-      set({
-        drafts: newDrafts,
-        entities: get().entities.map((e) =>
-          e.$id === entityId ? { ...e, name, $updatedAt: updated.$updatedAt } : e
-        ),
-      });
-    },
-
-    // ═══════════════════════════════════════
-    // REALTIME
-    // ═══════════════════════════════════════
-
-    _applyRemoteUpdate: (remote) => {
-      const { activeEntityId, drafts } = get();
-
-      // Обновляем в списке всегда
-      set((state) => ({
-        entities: state.entities.map((e) =>
-          e.$id === remote.$id ? remote : e
-        ),
-      }));
-
-      // Если нет черновика — нечего обновлять
-      const draft = drafts[remote.$id];
-      if (!draft) return;
-
-      // Подтверждение нашего сохранения?
-      const isOurAck =
-        !draft.isSaving &&
-        draft.lastSavedAt &&
-        Date.now() - draft.lastSavedAt < 3000 &&
-        remote.data === draft.graphString;
-
-      if (isOurAck) {
-        // Наше сохранение подтверждено — ничего не делаем
-        return;
-      }
-
-      // Чужое обновление
-      if (draft.isDirty) {
-        // Конфликт: помечаем ошибкой, но НЕ перезаписываем
-        const newDrafts = {
-          ...drafts,
-          [remote.$id]: {
-            ...draft,
-            saveError: 'Конфликт: на сервере новая версия. Сохраните или перезагрузите.',
-          },
-        };
-        set({ drafts: newDrafts });
-        return;
-      }
-
-      // Безопасно применяем
-      const newDrafts = {
-        ...drafts,
-        [remote.$id]: {
-          ...draft,
-          entity: remote,
-          graphString: remote.data,
-          originalGraphString: remote.data,
-          isDirty: false,
-        },
-      };
-      set({ drafts: newDrafts });
     },
   }))
 );
+
+// ====================== SELECTORS ======================
+import { useShallow } from 'zustand/react/shallow';
+
+export const useCurrentNodes = () => useGraphStore(useShallow((s) => s.currentNodes()));
+export const useCurrentEdges = () => useGraphStore(useShallow((s) => s.currentEdges()));
+export const useAwarenessUsers = () => useGraphStore(useShallow((s) => s.awarenessUsers));
+export const useCurrentDraft = () => useGraphStore(useShallow((s) => s.currentDraft()));

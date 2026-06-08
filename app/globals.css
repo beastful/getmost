@@ -128,3 +128,12 @@
     @apply font-sans;
   }
 }
+
+.react-flow svg {
+  overflow: visible;
+}
+
+.hide-native-cursor,
+.hide-native-cursor * {
+  cursor: none !important;
+}

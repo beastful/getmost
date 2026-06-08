@@ -18,6 +18,7 @@ export async function createWorkspace(data: CreateWorkspaceData): Promise<Worksp
             Permission.update(Role.user(data.ownerId)),
             Permission.delete(Role.user(data.ownerId)),
             Permission.read(Role.team(team.$id)),
+            Permission.read(Role.any()),
             Permission.update(Role.team(team.$id)),
         ];
 

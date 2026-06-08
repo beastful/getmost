@@ -11,9 +11,9 @@ export function useWorkspace(workspaceId: string | null) {
     queryFn: async () => {
       if (!user) throw new Error('You must be logged in');
       const workspace = await readWorkspace(workspaceId!);
-      if (workspace.ownerId !== user.$id) {
-        throw new Error('Access denied');
-      }
+      // if (workspace.ownerId !== user.$id) {
+      //   throw new Error('Access denied');
+      // }
       return workspace;
     },
     enabled: !!workspaceId && !!user,
