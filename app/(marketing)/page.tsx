@@ -163,6 +163,7 @@ export default function KnitLandingPage() {
       ],
       cta: "Начать бесплатно",
       popular: false,
+      href: "/dashboard",
     },
     {
       name: "Рост",
@@ -181,6 +182,7 @@ export default function KnitLandingPage() {
       ],
       cta: "Начать пробный период",
       popular: true,
+      href: "/dashboard",
     },
     {
       name: "Масштаб",
@@ -200,6 +202,7 @@ export default function KnitLandingPage() {
       ],
       cta: "Связаться с отделом продаж",
       popular: false,
+      href: "/contact",
     },
     {
       name: "Корпоративный",
@@ -218,6 +221,7 @@ export default function KnitLandingPage() {
       ],
       cta: "Поговорить с отделом продаж",
       popular: false,
+      href: "/contact",
     },
   ];
 
@@ -250,15 +254,15 @@ export default function KnitLandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground antialiased">
+    <div className="min-h-screen bg-white text-gray-900 antialiased">
       {/* Navigation */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/90 backdrop-blur-xl">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
-              <Network className="h-4 w-4 text-white" />
+            <div className="flex h-8 w-8 items-center justify-center">
+             <img width="30" src="/logo.svg"/>
             </div>
-            <span className="text-xl font-bold tracking-tight">Мост</span>
+            <span className="text-xl font-bold tracking-tight text-gray-900">Мост</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
@@ -266,24 +270,28 @@ export default function KnitLandingPage() {
               <a
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" size="lg">
-              Вход
-            </Button>
-            <Button size="lg" className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">
-              Начать бесплатно <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
+          <div className="hidden md:flex items-center gap-3">
+            <a href="/login">
+              <Button variant="ghost" size="sm" className="text-gray-700 hover:text-gray-900 hover:bg-gray-100">
+                Вход
+              </Button>
+            </a>
+            <a href="/signup">
+              <Button size="sm" className="bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white border-0">
+                Регистрация
+              </Button>
+            </a>
           </div>
 
           <button
-            className="md:hidden p-2"
+            className="md:hidden p-2 text-gray-600"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -291,24 +299,28 @@ export default function KnitLandingPage() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden border-t bg-background px-4 py-4 space-y-3">
+          <div className="md:hidden border-t border-gray-200 bg-white px-4 py-4 space-y-3">
             {navLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="block text-sm font-medium text-muted-foreground hover:text-foreground"
+                className="block text-sm font-medium text-gray-600 hover:text-gray-900"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}
               </a>
             ))}
-            <Separator />
-            <Button variant="ghost" size="lg" className="w-full justify-start">
-              Вход
-            </Button>
-            <Button size="lg" className="w-full bg-gradient-to-r from-violet-600 to-indigo-600">
-              Начать бесплатно
-            </Button>
+            <Separator className="bg-gray-200" />
+            <a href="/login" className="block w-full">
+              <Button variant="ghost" size="lg" className="w-full justify-start text-gray-700 hover:text-gray-900">
+                Вход
+              </Button>
+            </a>
+            <a href="/signup" className="block w-full">
+              <Button size="lg" className="w-full bg-gradient-to-r from-red-500 to-purple-600 text-white">
+                Регистрация
+              </Button>
+            </a>
           </div>
         )}
       </header>
@@ -316,9 +328,9 @@ export default function KnitLandingPage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 pb-32 md:pt-32 md:pb-40">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]" />
-          <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-violet-400 opacity-20 blur-[100px]" />
-          <div className="absolute right-0 top-0 -z-10 h-[310px] w-[310px] rounded-full bg-indigo-400 opacity-20 blur-[100px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808010_1px,transparent_1px),linear-gradient(to_bottom,#80808010_1px,transparent_1px)] bg-[size:14px_24px]" />
+          <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-red-200 opacity-20 blur-[100px]" />
+          <div className="absolute right-0 top-0 -z-10 h-[310px] w-[310px] rounded-full bg-purple-200 opacity-20 blur-[100px]" />
         </div>
 
         <div className="container mx-auto px-4 md:px-6">
@@ -328,22 +340,13 @@ export default function KnitLandingPage() {
             animate="animate"
             variants={staggerContainer}
           >
-            <motion.div variants={fadeInUp}>
-              <Badge
-                variant="secondary"
-                className="mb-6 px-3 py-1 text-sm font-medium bg-violet-100 text-violet-800 hover:bg-violet-100"
-              >
-                <Sparkles className="mr-1 h-3 w-3" />
-                Теперь со шлюзом ИИ-агентов
-              </Badge>
-            </motion.div>
-
+        
             <motion.h1
               variants={fadeInUp}
-              className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70"
+              className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900"
             >
               Единый интеграционный слой{" "}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-600">
                 для B2B SaaS
               </span>{" "}<br />
               и ИИ-агентов
@@ -351,7 +354,7 @@ export default function KnitLandingPage() {
 
             <motion.p
               variants={fadeInUp}
-              className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed"
+              className="mt-6 text-lg md:text-xl text-gray-600 max-w-2xl leading-relaxed"
             >
               Подключите ваш SaaS-продукт ко всей B2B-экосистеме и инфраструктуре ИИ-агентов за дни, а не месяцы. Одна унифицированная платформа для всех интеграционных задач.
             </motion.p>
@@ -360,14 +363,16 @@ export default function KnitLandingPage() {
               variants={fadeInUp}
               className="mt-8 flex flex-col sm:flex-row gap-4"
             >
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-8"
-              >
-                Начать бесплатно
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" className="px-8">
+              <a href="/dashboard">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white px-8"
+                >
+                  Начать бесплатно
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </a>
+              <Button size="lg" variant="outline" className="px-8 border-gray-300 text-gray-700 hover:bg-gray-50">
                 <Globe className="mr-2 h-4 w-4" />
                 Смотреть демо
               </Button>
@@ -375,29 +380,29 @@ export default function KnitLandingPage() {
 
             <motion.p
               variants={fadeInUp}
-              className="mt-4 text-sm text-muted-foreground"
+              className="mt-4 text-sm text-gray-500"
             >
-              Без банковской карты · Бесплатно для стартапов навсегда
+              Без банковской карты · Бесплатно для стартапов
             </motion.p>
           </motion.div>
         </div>
       </section>
 
-      {/* Logos / Social Proof */}
-      <section className="border-y bg-muted/30 py-12">
+      {/* Logos / Social Proof (empty for design) */}
+      <section className="border-y border-gray-200 bg-gray-50/50 py-12">
       </section>
 
       {/* Problem Section */}
-      <section id="solutions" className="py-24 md:py-32">
+      <section id="solutions" className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <Badge variant="outline" className="mb-4">
+            <Badge variant="outline" className="mb-4 border-gray-300 text-gray-600">
               Проблема
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
               Интеграции тормозят вашу разработку
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
+            <p className="mt-4 text-lg text-gray-600">
               Каждая B2B-SaaS-компания сталкивается с одним и тем же интеграционным кризисом. Ваша дорожная карта страдает, пока инженеры тонут в поддержке коннекторов.
             </p>
           </div>
@@ -411,18 +416,18 @@ export default function KnitLandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="h-full hover:shadow-lg transition-shadow">
+                <Card className="h-full border-gray-200 hover:border-red-200 transition-all shadow-sm hover:shadow-md">
                   <CardHeader>
-                    <div className="text-3xl font-bold text-red-500/80 mb-2">
+                    <div className="text-3xl font-bold text-red-500 mb-2">
                       {problem.stat}
                     </div>
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {problem.statLabel}
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <h3 className="text-xl font-semibold mb-2">{problem.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{problem.title}</h3>
+                    <p className="text-gray-600 leading-relaxed">
                       {problem.description}
                     </p>
                   </CardContent>
@@ -434,16 +439,16 @@ export default function KnitLandingPage() {
       </section>
 
       {/* Solution / Features Section */}
-      <section id="product" className="py-24 md:py-32 bg-muted/30">
+      <section id="product" className="py-24 md:py-32 bg-gray-50">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <Badge variant="outline" className="mb-4 border-violet-500/30 text-violet-700">
+            <Badge variant="outline" className="mb-4 border-red-200 text-red-600 bg-red-50">
               Платформа
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
               Одна платформа. Все интеграции. Готовность к ИИ.
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
+            <p className="mt-4 text-lg text-gray-600">
               Мост заменяет всю вашу интеграционную инфраструктуру единой безопасной масштабируемой платформой, созданной для современного B2B SaaS.
             </p>
           </div>
@@ -457,15 +462,15 @@ export default function KnitLandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="h-full group hover:shadow-md transition-all duration-300 border-border/50">
+                <Card className="h-full group hover:shadow-md transition-all duration-300 bg-white border-gray-200">
                   <CardHeader>
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/10 to-indigo-500/10 flex items-center justify-center text-violet-600 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-100 to-purple-100 flex items-center justify-center text-red-600 group-hover:scale-110 transition-transform duration-300">
                       {feature.icon}
                     </div>
-                    <CardTitle className="mt-4 text-lg">{feature.title}</CardTitle>
+                    <CardTitle className="mt-4 text-lg text-gray-900">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base leading-relaxed">
+                    <CardDescription className="text-base leading-relaxed text-gray-600">
                       {feature.description}
                     </CardDescription>
                   </CardContent>
@@ -477,13 +482,13 @@ export default function KnitLandingPage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 md:py-32">
+      <section className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <Badge variant="outline" className="mb-4">
+            <Badge variant="outline" className="mb-4 border-gray-300 text-gray-600">
               Как это работает
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
               От нуля до интеграции в четыре шага
             </h2>
           </div>
@@ -498,11 +503,11 @@ export default function KnitLandingPage() {
                 transition={{ delay: index * 0.15 }}
                 className="relative"
               >
-                <div className="text-5xl font-bold text-muted-foreground/20 mb-4">
+                <div className="text-5xl font-bold text-gray-200 mb-4">
                   {step.number}
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">{step.title}</h3>
+                <p className="text-gray-600 leading-relaxed">
                   {step.description}
                 </p>
               </motion.div>
@@ -512,19 +517,19 @@ export default function KnitLandingPage() {
       </section>
 
       {/* AI Agent Section */}
-      <section className="py-24 md:py-32 bg-gradient-to-b from-violet-950 via-indigo-950 to-background text-white overflow-hidden relative">
+      <section className="py-24 md:py-32 bg-gradient-to-b from-red-950 via-purple-950 to-gray-900 text-white overflow-hidden relative">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="container mx-auto px-4 md:px-6 relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <Badge className="mb-6 bg-violet-500/20 text-violet-200 border-violet-500/30">
+              <Badge className="mb-6 bg-red-500/20 text-red-200 border-red-500/30">
                 <Cpu className="mr-1 h-3 w-3" />
                 Шлюз ИИ-агентов
               </Badge>
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
                 Ваша платформа готова к эре ИИ
               </h2>
-              <p className="text-lg text-violet-100/80 mb-8 leading-relaxed">
+              <p className="text-lg text-red-100/80 mb-8 leading-relaxed">
                 ИИ-агенты — это новые пользователи. Мост предоставляет безопасную инфраструктуру для взаимодействия автономных систем с вашей B2B-платформой — с полной наблюдаемостью, управлением правами доступа и аудиторскими журналами.
               </p>
               <ul className="space-y-4">
@@ -535,32 +540,34 @@ export default function KnitLandingPage() {
                   "Автоматическое распознавание схем для больших языковых моделей",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">
-                    <div className="mt-1 h-5 w-5 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                      <Check className="h-3 w-3 text-violet-300" />
+                    <div className="mt-1 h-5 w-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="h-3 w-3 text-red-300" />
                     </div>
-                    <span className="text-violet-100/90">{item}</span>
+                    <span className="text-red-100/90">{item}</span>
                   </li>
                 ))}
               </ul>
-              <Button
-                size="lg"
-                className="mt-8 bg-white text-violet-900 hover:bg-violet-50"
-              >
-                Изучить шлюз ИИ
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              <a href="/ai-gateway">
+                <Button
+                  size="lg"
+                  className="mt-8 bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white"
+                >
+                  Изучить шлюз ИИ
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </a>
             </div>
             <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-2xl opacity-20 blur-2xl" />
-              <Card className="relative bg-slate-900/80 border-slate-700/50 backdrop-blur-sm">
+              <div className="absolute -inset-4 bg-gradient-to-r from-red-500 to-purple-600 rounded-2xl opacity-20 blur-2xl" />
+              <Card className="relative bg-gray-900/80 border-gray-700/50 backdrop-blur-sm">
                 <CardContent className="p-6 font-mono text-sm">
-                  <div className="flex items-center gap-2 mb-4 text-slate-400">
+                  <div className="flex items-center gap-2 mb-4 text-gray-500">
                     <div className="h-3 w-3 rounded-full bg-red-500/80" />
                     <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
                     <div className="h-3 w-3 rounded-full bg-green-500/80" />
                     <span className="ml-2 text-xs">agent-session.json</span>
                   </div>
-                  <pre className="text-violet-300 overflow-x-auto">
+                  <pre className="text-pink-300 overflow-x-auto">
 {`{
   "agent_id": "agt_2vR9kLmP",
   "platform": "customer-crm",
@@ -589,29 +596,29 @@ export default function KnitLandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 md:py-32">
+      <section id="pricing" className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <Badge variant="outline" className="mb-4">
+            <Badge variant="outline" className="mb-4 border-gray-300 text-gray-600">
               Тарифы
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
               Простая и прозрачная ценовая политика
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
+            <p className="mt-4 text-lg text-gray-600">
               Начинайте бесплатно, масштабируйтесь по мере роста. Никаких скрытых платежей и непредвиденных сборов.
             </p>
           </div>
 
           <div className="flex items-center justify-center gap-3 mb-12">
-            <span className={`text-sm font-medium ${!isAnnual ? "text-foreground" : "text-muted-foreground"}`}>
+            <span className={`text-sm font-medium ${!isAnnual ? "text-gray-900" : "text-gray-500"}`}>
               Помесячно
             </span>
             <Switch checked={isAnnual} onCheckedChange={setIsAnnual} />
-            <span className={`text-sm font-medium ${isAnnual ? "text-foreground" : "text-muted-foreground"}`}>
+            <span className={`text-sm font-medium ${isAnnual ? "text-gray-900" : "text-gray-500"}`}>
               Ежегодно
             </span>
-            <Badge variant="secondary" className="ml-2 text-xs">
+            <Badge variant="secondary" className="ml-2 text-xs bg-red-100 text-red-700 border-red-200">
               Экономия 20%
             </Badge>
           </div>
@@ -620,28 +627,28 @@ export default function KnitLandingPage() {
             {pricingPlans.map((plan) => (
               <Card
                 key={plan.name}
-                className={`flex flex-col h-full ${
+                className={`flex flex-col h-full bg-white border ${
                   plan.popular
-                    ? "border-violet-500 shadow-lg shadow-violet-500/10 relative"
-                    : "border-border/50"
+                    ? "border-red-500 shadow-lg shadow-red-100 relative"
+                    : "border-gray-200"
                 }`}
               >
                 <CardHeader className="flex-1">
-                  <CardTitle className="text-lg">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardTitle className="text-lg text-gray-900">{plan.name}</CardTitle>
+                  <CardDescription className="text-gray-500">{plan.description}</CardDescription>
                   <div className="mt-4">
                     {plan.monthlyPrice !== null ? (
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold">
+                        <span className="text-4xl font-bold text-gray-900">
                           ${isAnnual ? plan.annualPrice : plan.monthlyPrice}
                         </span>
-                        <span className="text-muted-foreground">/мес</span>
+                        <span className="text-gray-500">/мес</span>
                       </div>
                     ) : (
-                      <div className="text-4xl font-bold">По запросу</div>
+                      <div className="text-4xl font-bold text-gray-900">По запросу</div>
                     )}
                     {isAnnual && plan.monthlyPrice !== null && plan.monthlyPrice > 0 && (
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-gray-500 mt-1">
                         ${plan.annualPrice * 12} при ежегодной оплате
                       </p>
                     )}
@@ -651,24 +658,26 @@ export default function KnitLandingPage() {
                   <ul className="space-y-3">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-2 text-sm">
-                        <Check className="h-4 w-4 text-violet-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-muted-foreground">{feature}</span>
+                        <Check className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-600">{feature}</span>
                       </li>
                     ))}
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button
-                    size="lg"
-                    className={`w-full ${
-                      plan.popular
-                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
-                        : ""
-                    }`}
-                    variant={plan.popular ? "default" : "outline"}
-                  >
-                    {plan.cta}
-                  </Button>
+                  <a href={plan.href} className="w-full">
+                    <Button
+                      size="lg"
+                      className={`w-full ${
+                        plan.popular
+                          ? "bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white border-0"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
+                      variant={plan.popular ? "default" : "outline"}
+                    >
+                      {plan.cta}
+                    </Button>
+                  </a>
                 </CardFooter>
               </Card>
             ))}
@@ -677,23 +686,23 @@ export default function KnitLandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-24 md:py-32 bg-muted/30">
+      <section className="py-24 md:py-32 bg-gray-50">
         <div className="container mx-auto px-4 md:px-6 max-w-3xl">
           <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-4">
+            <Badge variant="outline" className="mb-4 border-gray-300 text-gray-600">
               Вопросы и ответы
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
               Часто задаваемые вопросы
             </h2>
           </div>
           <Accordion type="single" collapsible className="w-full">
             {faqs.map((faq, index) => (
-              <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="text-left text-base font-medium">
+              <AccordionItem key={index} value={`item-${index}`} className="border-gray-200">
+                <AccordionTrigger className="text-left text-base font-medium text-gray-900 hover:text-red-600">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed">
+                <AccordionContent className="text-gray-600 leading-relaxed">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -703,32 +712,36 @@ export default function KnitLandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 md:py-32">
+      <section className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 to-indigo-700 p-8 md:p-16 text-center">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-500 to-purple-600 p-8 md:p-16 text-center">
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px]" />
             <div className="relative z-10 max-w-2xl mx-auto">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
                 Готовы унифицировать свои интеграции?
               </h2>
-              <p className="text-lg text-violet-100 mb-8">
+              <p className="text-lg text-white/80 mb-8">
                 Присоединяйтесь к сотням B2B-SaaS-команд, которые внедряют интеграции быстрее с помощью Моста. Начните бесплатно уже сегодня.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  size="lg"
-                  className="bg-white text-violet-700 hover:bg-violet-50 px-8"
-                >
-                  Начать бесплатно
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-violet-300 text-white hover:bg-violet-600/50 px-8"
-                >
-                  Поговорить с отделом продаж
-                </Button>
+                <a href="/dashboard">
+                  <Button
+                    size="lg"
+                    className="bg-white text-red-600 hover:bg-red-50 px-8"
+                  >
+                    Начать бесплатно
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </a>
+                <a href="/contact">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-white/50 text-white hover:bg-white/10 px-8"
+                  >
+                    Поговорить с отделом продаж
+                  </Button>
+                </a>
               </div>
             </div>
           </div>
@@ -736,57 +749,57 @@ export default function KnitLandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-background py-12">
+      <footer className="border-t border-gray-200 bg-white py-12">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-purple-600">
                   <Network className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-xl font-bold">Мост</span>
+                <span className="text-xl font-bold text-gray-900">Мост</span>
               </div>
-              <p className="text-sm text-muted-foreground max-w-xs">
+              <p className="text-sm text-gray-600 max-w-xs">
                 Унифицированная интеграционная платформа для B2B SaaS и инфраструктуры ИИ-агентов.
               </p>
               <div className="flex gap-4 mt-4">
               </div>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Продукт</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground">Коннекторы</a></li>
-                <li><a href="#" className="hover:text-foreground">Шлюз ИИ</a></li>
-                <li><a href="#" className="hover:text-foreground">Сценарии</a></li>
-                <li><a href="#" className="hover:text-foreground">Безопасность</a></li>
+              <h4 className="font-semibold text-gray-900 mb-3">Продукт</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li><a href="#" className="hover:text-red-500">Коннекторы</a></li>
+                <li><a href="#" className="hover:text-red-500">Шлюз ИИ</a></li>
+                <li><a href="#" className="hover:text-red-500">Сценарии</a></li>
+                <li><a href="#" className="hover:text-red-500">Безопасность</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Разработчикам</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground">Документация</a></li>
-                <li><a href="#" className="hover:text-foreground">Справочник API</a></li>
-                <li><a href="#" className="hover:text-foreground">SDK</a></li>
-                <li><a href="#" className="hover:text-foreground">Статус</a></li>
+              <h4 className="font-semibold text-gray-900 mb-3">Разработчикам</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li><a href="#" className="hover:text-red-500">Документация</a></li>
+                <li><a href="#" className="hover:text-red-500">Справочник API</a></li>
+                <li><a href="#" className="hover:text-red-500">SDK</a></li>
+                <li><a href="#" className="hover:text-red-500">Статус</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Компания</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground">О компании</a></li>
-                <li><a href="#" className="hover:text-foreground">Блог</a></li>
-                <li><a href="#" className="hover:text-foreground">Вакансии</a></li>
-                <li><a href="#" className="hover:text-foreground">Контакты</a></li>
+              <h4 className="font-semibold text-gray-900 mb-3">Компания</h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li><a href="#" className="hover:text-red-500">О компании</a></li>
+                <li><a href="#" className="hover:text-red-500">Блог</a></li>
+                <li><a href="#" className="hover:text-red-500">Вакансии</a></li>
+                <li><a href="#" className="hover:text-red-500">Контакты</a></li>
               </ul>
             </div>
           </div>
-          <Separator />
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 text-sm text-muted-foreground">
+          <Separator className="bg-gray-200" />
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 text-sm text-gray-500">
             <p>© 2026 Мост Интеграция. Все права защищены.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-foreground">Конфиденциальность</a>
-              <a href="#" className="hover:text-foreground">Условия использования</a>
-              <a href="#" className="hover:text-foreground">Файлы cookie</a>
+              <a href="#" className="hover:text-red-500">Конфиденциальность</a>
+              <a href="#" className="hover:text-red-500">Условия использования</a>
+              <a href="#" className="hover:text-red-500">Файлы cookie</a>
             </div>
           </div>
         </div>
