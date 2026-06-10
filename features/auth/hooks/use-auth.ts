@@ -47,7 +47,7 @@ export function useAuth() {
   const signUp = useCallback(
     async (email: string, password: string, name?: string) => {
       const result = await wrap(async () => {
-        await account.create({ userId: email, email, password, name });
+        await account.create({ userId: ID.unique(), email, password, name });
         await account.createEmailPasswordSession({ email, password });
         await account.createEmailVerification({
           url: `${getOrigin()}/verify-email`,

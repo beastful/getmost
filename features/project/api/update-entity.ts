@@ -1,8 +1,8 @@
-import { tables } from "@/lib/appwrite";
+import { databases } from "@/lib/appwrite";
 import { UpdateEntityData, Entity } from "../types/types";
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const ENTITIES_TABLE_NAME = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
+const ENTITIES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
 
 export async function updateEntity(entityId: string, data: UpdateEntityData): Promise<Entity> {
   try {
@@ -18,12 +18,12 @@ export async function updateEntity(entityId: string, data: UpdateEntityData): Pr
     if (data.store !== undefined) updateData.store = data.store;
     if (data.price !== undefined) updateData.price = data.price;
 
-    const updated = await tables.updateRow({
-      databaseId: DATABASE_ID,
-      tableId: ENTITIES_TABLE_NAME,
-      rowId: entityId,
-      data: updateData,
-    });
+    const updated = await databases.updateDocument(
+      DATABASE_ID,
+      ENTITIES_COLLECTION_ID,
+      entityId,
+      updateData
+    );
     return updated as unknown as Entity;
   } catch (error) {
     console.error('Error updating entity:', error);

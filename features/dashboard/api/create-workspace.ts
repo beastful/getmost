@@ -1,8 +1,8 @@
-import { teams, ID, tables, Permission, Role } from "@/lib/appwrite";
+import { teams, ID, databases, Permission, Role } from "@/lib/appwrite";
 import { Workspace, CreateWorkspaceData } from "../types/types";
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const WORKSPACES_TABLE_NAME = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_COLLECTION_ID!;
+const WORKSPACES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_COLLECTION_ID!;
 
 export async function createWorkspace(data: CreateWorkspaceData): Promise<Workspace> {
     try {
@@ -22,28 +22,28 @@ export async function createWorkspace(data: CreateWorkspaceData): Promise<Worksp
             Permission.update(Role.team(team.$id)),
         ];
 
-        // 3. Insert row into 'workspaces' table with permissions
-        const row = await tables.createRow({
-            databaseId: DATABASE_ID,
-            tableId: WORKSPACES_TABLE_NAME,
-            rowId: ID.unique(),
-            data: {
+        // 3. Insert document into 'workspaces' collection with permissions
+        const document = await databases.createDocument(
+            DATABASE_ID,
+            WORKSPACES_COLLECTION_ID,
+            ID.unique(),
+            {
                 name: data.name,
                 ownerId: data.ownerId,
                 teamId: team.$id,
                 entities: data.entities || [],
             },
-            permissions,
-        });
+            permissions
+        );
 
         return {
-            $id: row.$id,
-            name: row.name,
-            ownerId: row.ownerId,
-            teamId: row.teamId,
-            entities: row.entities,
-            $createdAt: row.$createdAt,
-            $updatedAt: row.$updatedAt,
+            $id: document.$id,
+            name: document.name,
+            ownerId: document.ownerId,
+            teamId: document.teamId,
+            entities: document.entities,
+            $createdAt: document.$createdAt,
+            $updatedAt: document.$updatedAt,
         };
     } catch (error) {
         console.error("Error creating workspace:", error);

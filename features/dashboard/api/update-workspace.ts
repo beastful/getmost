@@ -1,8 +1,8 @@
-import { teams, ID, databases, tables } from "@/lib/appwrite";
+import { teams, ID, databases } from "@/lib/appwrite";
 import { Workspace, CreateWorkspaceData } from "../types/types";
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const WORKSPACES_TABLE_NAME = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_COLLECTION_ID!;
+const WORKSPACES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_COLLECTION_ID!;
 
 export async function updateWorkspace(
   workspaceId: string,
@@ -13,12 +13,12 @@ export async function updateWorkspace(
     if (data.name !== undefined) updateData.name = data.name;
     if (data.entities !== undefined) updateData.entities = JSON.stringify(data.entities);
 
-    const updated = await tables.updateRow({
-      databaseId: DATABASE_ID,
-      tableId: WORKSPACES_TABLE_NAME,
-      rowId: workspaceId,
-      data: updateData,
-    });
+    const updated = await databases.updateDocument(
+      DATABASE_ID,
+      WORKSPACES_COLLECTION_ID,
+      workspaceId,
+      updateData
+    );
 
     return {
       $id: updated.$id,

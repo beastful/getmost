@@ -1,8 +1,8 @@
-import { tables, Query } from "@/lib/appwrite";
-import {Entity } from "../types/types";
+import { databases, Query } from "@/lib/appwrite";
+import { Entity } from "../types/types";
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const ENTITIES_TABLE_NAME = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
+const ENTITIES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
 
 export async function listEntities({
   workspaceId,
@@ -33,14 +33,14 @@ export async function listEntities({
     if (search) queries.push(Query.search('name', search));
     queries.push(Query.limit(limit), Query.offset(offset));
 
-    const response = await tables.listRows({
-      databaseId: DATABASE_ID,
-      tableId: ENTITIES_TABLE_NAME,
-      queries,
-    });
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      ENTITIES_COLLECTION_ID,
+      queries
+    );
 
     return {
-      entities: response.rows as unknown as Entity[],
+      entities: response.documents as unknown as Entity[],
       total: response.total,
     };
   } catch (error) {

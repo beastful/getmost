@@ -140,7 +140,7 @@ function useLobbyProvider() {
     if (!workspaceId || !user?.$id || !user.email) return;
 
     const ydoc = new Y.Doc();
-    const HOCUSPOCUS_URL = "wss://ws.getmost.app";
+    const HOCUSPOCUS_URL = "wss://ez5c0rv0qswls1v5jm2yzvdc.getmost.app";
 
     const buildSelfAwareness = (
       override?: Partial<UserAwareness>

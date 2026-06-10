@@ -1,9 +1,9 @@
 import { readWorkspace } from "@/features/dashboard/api/read-workspace";
-import { tables, ID, Permission, Role } from "@/lib/appwrite";
+import { databases, ID, Permission, Role } from "@/lib/appwrite";
 import { CreateEntityData, Entity } from "../types/types";
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const ENTITIES_TABLE_NAME = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
+const ENTITIES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_ENTITIES_COLLECTION_ID!;
 
 export async function createEntity(data: CreateEntityData): Promise<Entity> {
     try {
@@ -15,11 +15,11 @@ export async function createEntity(data: CreateEntityData): Promise<Entity> {
             Permission.delete(Role.user(workspace.ownerId)),
         ];
 
-        const row = await tables.createRow({
-            databaseId: DATABASE_ID,
-            tableId: ENTITIES_TABLE_NAME,
-            rowId: ID.unique(),
-            data: {
+        const document = await databases.createDocument(
+            DATABASE_ID,
+            ENTITIES_COLLECTION_ID,
+            ID.unique(),
+            {
                 name: data.name,
                 description: data.description || '',
                 folders: data.folders || [],
@@ -32,13 +32,12 @@ export async function createEntity(data: CreateEntityData): Promise<Entity> {
                 store: data.store ?? false,
                 price: data.price ?? 0,
             },
-            permissions,
-        });
+            permissions
+        );
 
-        return row as unknown as Entity;
+        return document as unknown as Entity;
     } catch (error) {
         console.error('Error creating entity:', error);
         throw error;
     }
 }
-

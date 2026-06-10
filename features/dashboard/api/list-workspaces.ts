@@ -1,8 +1,8 @@
-import { teams, ID, databases, Query, tables } from "@/lib/appwrite";
+import { teams, ID, databases, Query } from "@/lib/appwrite";
 import { Workspace, CreateWorkspaceData } from "../types/types";
 
 const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-const WORKSPACES_TABLE_NAME = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_COLLECTION_ID!;
+const WORKSPACES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_WORKSPACES_COLLECTION_ID!;
 
 export async function listWorkspaces({
   ownerId,
@@ -29,21 +29,21 @@ export async function listWorkspaces({
     }
     queries.push(Query.limit(limit), Query.offset(offset));
 
-    const response = await tables.listRows({
-      databaseId: DATABASE_ID,
-      tableId: WORKSPACES_TABLE_NAME,
-      queries,
-    });
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      WORKSPACES_COLLECTION_ID,
+      queries
+    );
 
     return {
-      workspaces: response.rows.map((row: any) => ({
-        $id: row.$id,
-        name: row.name,
-        ownerId: row.ownerId,
-        teamId: row.teamId,
-        entities: row.entities,
-        $createdAt: row.$createdAt,
-        $updatedAt: row.$updatedAt,
+      workspaces: response.documents.map((doc: any) => ({
+        $id: doc.$id,
+        name: doc.name,
+        ownerId: doc.ownerId,
+        teamId: doc.teamId,
+        entities: doc.entities,
+        $createdAt: doc.$createdAt,
+        $updatedAt: doc.$updatedAt,
       })),
       total: response.total,
     };
