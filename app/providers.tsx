@@ -6,6 +6,8 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 import { useEffect } from 'react';
 import { useAuthStore } from '@/features/auth/store/auth-store';
+import * as React from "react"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const init = useAuthStore((s) => s.init);
@@ -33,7 +35,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
+        <NextThemesProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </NextThemesProvider>
       </AuthProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
