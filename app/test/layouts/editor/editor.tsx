@@ -63,7 +63,7 @@ export default function TestEditor({ children }: { children: ReactNode }) {
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
-                        colorMode={theme as ColorMode || 'light'}
+                        colorMode={theme as ColorMode || 'system'}
                         fitView
                     >
                         {children}

@@ -36,8 +36,52 @@ import {
     AvatarImage,
 } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
-import { Copy, Save, Star, Trash } from "lucide-react";
+import { Copy, LineChart, Plug, Save, Search, Star, Trash } from "lucide-react";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
+
+export function DropdownMenuNode() {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                    <Plug />
+                    Добавить блок
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="center" className="w-120 p-3">
+                <DropdownMenuGroup className="flex flex-col gap-2 h-full">
+                    <InputGroup>
+                        <InputGroupInput placeholder="AI фагенты"/>
+                         <InputGroupAddon align="inline-end">
+                            <Search />
+                        </InputGroupAddon>
+                    </InputGroup>
+                    <div className="flex gap-1">
+                        <Button variant={'outline'} size={'sm'} className="rounded-full">AI</Button>
+                        <Button variant={'outline'} size={'sm'} className="rounded-full">Number</Button>
+                        <Button variant={'outline'} size={'sm'} className="rounded-full">Type</Button>
+                    </div>
+                    <ScrollArea className="lg:h-50 h-[100px]">
+                        <div className="grid grid-cols-2 gap-4 pb-10">
+                            {[...new Array(10)].map(m => <div className="flex items-center gap-4">
+                                <div className="bg-muted w-12 h-12 min-w-12 flex rounded-md flex items-center justify-center">
+                                    <LineChart className="text-muted-foreground" />
+                                </div>
+                                <div>
+                                    <div className="font-medium">New node</div>
+                                    <div className="text-muted-foreground text-xs">Lorem ipsum dolor sit amet consectetur.</div>
+                                </div>
+                            </div>)}
+                        </div>
+                    </ScrollArea>
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+}
 
 export function AvatarGroupExample() {
     return (
@@ -209,7 +253,7 @@ export default function EditorInner() {
                 <SocialButtons />
             </Panel>
             <Panel position="bottom-center">
-                <Button variant={"outline"}>Nodes</Button>
+                <DropdownMenuNode />
             </Panel>
             <Panel position="bottom-right">
                 <ControlButons />
