@@ -18,6 +18,7 @@ export interface FlowNode {
   position: { x: number; y: number };
   data: Record<string, any>;
   selected?: boolean;
+  measured?: any;
 }
 
 export interface FlowEdge {
@@ -25,6 +26,7 @@ export interface FlowEdge {
   source: string;
   target: string;
   animated?: boolean;
+  selected?: boolean;
 }
 
 export interface UserAwareness {
@@ -64,10 +66,27 @@ const getRandomColor = (): string => COLLAB_COLORS[Math.floor(Math.random() * CO
 const generateUserName = (): string => `User ${Math.floor(Math.random() * 10000)}${Date.now()}`;
 
 const yMapToArray = <T>(map: Y.Map<T>): T[] => Array.from(map.values());
-
 const fastEqual = <T>(a: T[], b: T[]): boolean => deepEqual(a, b);
 
-// Global collab sessions (kept for simplicity)
+// ==================== CLEANING HELPERS ====================
+const cleanNodeForSync = (node: FlowNode): FlowNode => {
+  const { selected, measured, dragging, resizing, ...cleanNode } = node;
+  const cleanData = { ...cleanNode.data };
+
+  // Do NOT sync computed / ephemeral fields
+  delete cleanData.outputs;
+  delete cleanData.inputs;
+  delete cleanData.templates;
+
+  return { ...cleanNode, data: cleanData };
+};
+
+const cleanEdgeForSync = (edge: FlowEdge): FlowEdge => {
+  const { selected, ...cleanEdge } = edge;
+  return cleanEdge;
+};
+
+// Global collab sessions
 const collabSessions = new Map<string, CollabSession>();
 
 const getCollabSession = (entityId: string) => collabSessions.get(entityId);
@@ -111,7 +130,7 @@ const initCollabSession = (
 
   const handleStatus = (event: any) => {
     set((state: any) => {
-      const d = state.drafts[entityId];
+      const d = state.drafts?.[entityId];
       if (!d) return state;
       return { drafts: { ...state.drafts, [entityId]: { ...d, connectionStatus: event.status } } };
     });
@@ -120,7 +139,7 @@ const initCollabSession = (
   const handleError = (err: any) => {
     console.error('Hocuspocus error:', err);
     set((state: any) => {
-      const d = state.drafts[entityId];
+      const d = state.drafts?.[entityId];
       if (!d) return state;
       return { drafts: { ...state.drafts, [entityId]: { ...d, connectionStatus: 'error', connectionError: String(err) } } };
     });
@@ -130,19 +149,15 @@ const initCollabSession = (
     if (initialSyncDone) return;
     initialSyncDone = true;
 
-    const currentDraft = get().drafts[entityId];
+    const currentDraft = get().drafts?.[entityId];
     if (!currentDraft) return;
 
     const isEmpty = yNodes.size === 0 && yEdges.size === 0;
 
     if (isEmpty && (currentDraft.nodes.length || currentDraft.edges.length)) {
-      // CHANGED: strip computed 'templates' (and 'selected') before writing to Yjs
       ydoc.transact(() => {
-        currentDraft.nodes.forEach((n) => {
-          const { selected, templates, ...cleanData } = n.data; // remove computed fields
-          yNodes.set(n.id, { ...n, data: cleanData });
-        });
-        currentDraft.edges.forEach((e) => yEdges.set(e.id, e));
+        currentDraft.nodes.forEach((n) => yNodes.set(n.id, cleanNodeForSync(n)));
+        currentDraft.edges.forEach((e) => yEdges.set(e.id, cleanEdgeForSync(e)));
       });
     } else if (!isEmpty) {
       set((state: any) => ({
@@ -168,20 +183,30 @@ const initCollabSession = (
     const newEdges = yMapToArray(yEdges);
 
     set((state: any) => {
-      const d = state.drafts[entityId];
+      const d = state.drafts?.[entityId];
       if (!d) return state;
 
-      // CHANGED: merge remote nodes with local templates to preserve computed values
-      const mergedNodes = newNodes.map((rn) => {
-        const local = d.nodes.find((n) => n.id === rn.id);
-        if (local && local.data?.templates) {
-          return { ...rn, data: { ...rn.data, templates: local.data.templates } };
+      const mergedNodes = newNodes.map((remote) => {
+        const local = d.nodes.find((n) => n.id === remote.id);
+        if (local) {
+          return {
+            ...remote,
+            data: {
+              ...remote.data,
+              outputs: local.data.outputs,
+              inputs: local.data.inputs,
+              templates: local.data.templates,
+            },
+          };
         }
-        return rn;
+        return remote;
       });
 
       if (fastEqual(d.nodes, mergedNodes) && fastEqual(d.edges, newEdges)) return state;
-      return { drafts: { ...state.drafts, [entityId]: { ...d, nodes: mergedNodes, edges: newEdges } } };
+
+      return {
+        drafts: { ...state.drafts, [entityId]: { ...d, nodes: mergedNodes, edges: newEdges } },
+      };
     });
   };
 
@@ -211,12 +236,10 @@ const initCollabSession = (
     unobserveEdges: () => yEdges.unobserve(updateFromYjs),
     unsubscribeAwareness: () => provider.awareness.off('change', updateAwareness),
   });
-
-  return { yNodes, yEdges };
 };
 
 // ====================== STORE ======================
-export const useGraphStore = create<GraphStore>()(
+export const useGraphStore = create<any>()(
   devtools((set, get) => ({
     // State
     entities: [],
@@ -243,19 +266,46 @@ export const useGraphStore = create<GraphStore>()(
     currentNodes: () => get().currentDraft()?.nodes ?? [],
     currentEdges: () => get().currentDraft()?.edges ?? [],
 
-    // User & Awareness
-    setCurrentUser: (user) => {
-      set((state) => ({ currentUser: { ...state.currentUser, ...user } }));
-      const activeId = get().activeEntityId;
-      if (activeId) {
-        getCollabSession(activeId)?.provider.awareness.setLocalStateField('user', {
-          ...get().currentUser,
-          ...user,
-        });
-      }
-    },
+    // Safe updater for outputs / computed data
+    updateNodeData: (nodeId: string, updates: Record<string, any>) => {
+      const { activeEntityId, drafts } = get();
+      if (!activeEntityId) return;
 
-    _updateAwarenessUsers: (users) => set({ awarenessUsers: users }),
+      set((state) => {
+        const draft = state.drafts[activeEntityId];
+        if (!draft) return state;
+
+        const nodes = draft.nodes;
+        const index = nodes.findIndex((n) => n.id === nodeId);
+        if (index === -1) return state;
+
+        const oldNode = nodes[index];
+        const newData = { ...oldNode.data, ...updates };
+
+        if (deepEqual(oldNode.data, newData)) return state;
+
+        const updatedNode = { ...oldNode, data: newData };
+        const updatedNodes = [...nodes];
+        updatedNodes[index] = updatedNode;
+
+        if (draft.isCollaborative) {
+          const session = getCollabSession(activeEntityId);
+          if (session) {
+            const yNodes = session.ydoc.getMap<FlowNode>('nodes');
+            session.ydoc.transact(() => {
+              yNodes.set(nodeId, cleanNodeForSync(updatedNode));
+            });
+          }
+        }
+
+        return {
+          drafts: {
+            ...state.drafts,
+            [activeEntityId]: { ...draft, nodes: updatedNodes, isDirty: true },
+          },
+        };
+      });
+    },
 
     // Entities CRUD
     loadEntities: async (params = {}) => {
@@ -435,7 +485,7 @@ export const useGraphStore = create<GraphStore>()(
     },
 
     // Nodes & Edges
-    setNodes: (nodes) => {
+    setNodes: (nodes: FlowNode[]) => {
       const { activeEntityId, drafts } = get();
       if (!activeEntityId) return;
       const draft = drafts[activeEntityId];
@@ -450,10 +500,7 @@ export const useGraphStore = create<GraphStore>()(
             yNodes.forEach((_, key) => { if (!currentIds.has(key)) yNodes.delete(key); });
 
             nodes.forEach((node) => {
-              // CHANGED: strip 'selected' and 'templates' (any computed field) before syncing
-              const { selected, ...rest } = node;
-              const { templates, ...cleanData } = rest.data;
-              yNodes.set(node.id, { ...rest, data: cleanData });
+              yNodes.set(node.id, cleanNodeForSync(node));
             });
           });
         }
@@ -471,7 +518,7 @@ export const useGraphStore = create<GraphStore>()(
       }));
     },
 
-    setEdges: (edges) => {
+    setEdges: (edges: FlowEdge[]) => {
       const { activeEntityId, drafts } = get();
       if (!activeEntityId) return;
       const draft = drafts[activeEntityId];
@@ -486,8 +533,7 @@ export const useGraphStore = create<GraphStore>()(
             yEdges.forEach((_, key) => { if (!currentIds.has(key)) yEdges.delete(key); });
 
             edges.forEach((edge) => {
-              const { selected, ...cleanEdge } = edge;
-              yEdges.set(edge.id, cleanEdge);
+              yEdges.set(edge.id, cleanEdgeForSync(edge));
             });
           });
         }
@@ -527,11 +573,7 @@ export const useGraphStore = create<GraphStore>()(
           }
         }
 
-        // OPTIONAL: also strip templates before saving to Appwrite for cleanliness
-        nodesToSave = nodesToSave.map(n => {
-          const { templates, ...cleanData } = n.data;
-          return { ...n, data: cleanData };
-        });
+        nodesToSave = nodesToSave.map(cleanNodeForSync);
 
         const dataToSave = JSON.stringify({ nodes: nodesToSave, edges: edgesToSave });
         const updated = await updateEntity(activeEntityId, { data: dataToSave });
