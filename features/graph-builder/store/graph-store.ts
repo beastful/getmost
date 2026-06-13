@@ -136,8 +136,12 @@ const initCollabSession = (
     const isEmpty = yNodes.size === 0 && yEdges.size === 0;
 
     if (isEmpty && (currentDraft.nodes.length || currentDraft.edges.length)) {
+      // CHANGED: strip computed 'templates' (and 'selected') before writing to Yjs
       ydoc.transact(() => {
-        currentDraft.nodes.forEach((n) => yNodes.set(n.id, n));
+        currentDraft.nodes.forEach((n) => {
+          const { selected, templates, ...cleanData } = n.data; // remove computed fields
+          yNodes.set(n.id, { ...n, data: cleanData });
+        });
         currentDraft.edges.forEach((e) => yEdges.set(e.id, e));
       });
     } else if (!isEmpty) {
@@ -166,8 +170,18 @@ const initCollabSession = (
     set((state: any) => {
       const d = state.drafts[entityId];
       if (!d) return state;
-      if (fastEqual(d.nodes, newNodes) && fastEqual(d.edges, newEdges)) return state;
-      return { drafts: { ...state.drafts, [entityId]: { ...d, nodes: newNodes, edges: newEdges } } };
+
+      // CHANGED: merge remote nodes with local templates to preserve computed values
+      const mergedNodes = newNodes.map((rn) => {
+        const local = d.nodes.find((n) => n.id === rn.id);
+        if (local && local.data?.templates) {
+          return { ...rn, data: { ...rn.data, templates: local.data.templates } };
+        }
+        return rn;
+      });
+
+      if (fastEqual(d.nodes, mergedNodes) && fastEqual(d.edges, newEdges)) return state;
+      return { drafts: { ...state.drafts, [entityId]: { ...d, nodes: mergedNodes, edges: newEdges } } };
     });
   };
 
@@ -331,7 +345,6 @@ export const useGraphStore = create<GraphStore>()(
 
     // Core Graph Operations
     openEntity: (entity) => {
-      // Safety: ensure any stale collaboration session for this entity is gone
       get().disableCollaboration(entity.$id);
 
       let nodes: FlowNode[] = [];
@@ -366,7 +379,6 @@ export const useGraphStore = create<GraphStore>()(
 
     switchEntity: async (entityId) => {
       const currentId = get().activeEntityId;
-      // Disable collaboration on the previously active entity
       if (currentId && currentId !== entityId) {
         get().disableCollaboration(currentId);
       }
@@ -438,14 +450,15 @@ export const useGraphStore = create<GraphStore>()(
             yNodes.forEach((_, key) => { if (!currentIds.has(key)) yNodes.delete(key); });
 
             nodes.forEach((node) => {
-              const { selected, ...cleanNode } = node;
-              yNodes.set(node.id, cleanNode);
+              // CHANGED: strip 'selected' and 'templates' (any computed field) before syncing
+              const { selected, ...rest } = node;
+              const { templates, ...cleanData } = rest.data;
+              yNodes.set(node.id, { ...rest, data: cleanData });
             });
           });
         }
       }
 
-      // Always update local state (selection stays local)
       set((state) => ({
         drafts: {
           ...state.drafts,
@@ -472,7 +485,6 @@ export const useGraphStore = create<GraphStore>()(
             const currentIds = new Set(edges.map((e) => e.id));
             yEdges.forEach((_, key) => { if (!currentIds.has(key)) yEdges.delete(key); });
 
-            // Strip local-only React Flow state before syncing
             edges.forEach((edge) => {
               const { selected, ...cleanEdge } = edge;
               yEdges.set(edge.id, cleanEdge);
@@ -515,6 +527,12 @@ export const useGraphStore = create<GraphStore>()(
           }
         }
 
+        // OPTIONAL: also strip templates before saving to Appwrite for cleanliness
+        nodesToSave = nodesToSave.map(n => {
+          const { templates, ...cleanData } = n.data;
+          return { ...n, data: cleanData };
+        });
+
         const dataToSave = JSON.stringify({ nodes: nodesToSave, edges: edgesToSave });
         const updated = await updateEntity(activeEntityId, { data: dataToSave });
 
@@ -547,7 +565,6 @@ export const useGraphStore = create<GraphStore>()(
     },
 
     disableCollaboration: (entityId) => {
-      // Clear the cursor throttle timer for this entity
       set((state) => {
         const timers = { ...state._cursorThrottleTimers };
         if (timers[entityId]) {

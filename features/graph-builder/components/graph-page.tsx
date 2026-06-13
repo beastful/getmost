@@ -10,6 +10,7 @@ import { Palette } from "@/features/graph-builder/components/palette";
 import { EmptyState } from "./empty-state";
 import CollaborationBar, { CursorOverlay } from "./awareness";
 import { CollaborationProvider, TeamGuard, VisitorManager } from "@/features/teams/components/team-guard";
+import GraphInner from "./graph-inner";
 
 export default function ProjectPage() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function ProjectPage() {
                   <Panel position="bottom-center">
                     <Palette />
                   </Panel>
+                  {/* <GraphInner /> */}
                 </GraphEditor>
 
               </EmptyState>

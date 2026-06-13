@@ -96,8 +96,8 @@ function GraphEditorInner({ children }: { children?: React.ReactNode }) {
           nodeTypes={{ flowNode: MemoizedFlowNode }}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect} fitView
-          deleteKeyCode={false}
+          onConnect={onConnect}
+          fitView
           snapGrid={[20, 20]}
           snapToGrid={true}
           onlyRenderVisibleElements={true} elevateEdgesOnSelect={false} proOptions={{ hideAttribution: true }}>
@@ -105,7 +105,6 @@ function GraphEditorInner({ children }: { children?: React.ReactNode }) {
           {/* <CursorOverlay /> */}
 
           <Background gap={20} size={1} />
-          <Controls />
           <Panel position='top-center'></Panel>
           {hasSelection && <Panel position="bottom-center" style={{ marginBottom: 80 }}><div className="flex items-center gap-2 bg-background/90 backdrop-blur-sm border rounded-full shadow-lg px-4 py-2"><button onClick={copySelected} className="p-2 hover:bg-accent rounded-full transition-colors" title="Copy"><Copy size={18} /></button><button onClick={paste} className="p-2 hover:bg-accent rounded-full transition-colors" title="Paste"><ClipboardPaste size={18} /></button><div className="w-px h-5 bg-border mx-1" /><button onClick={deleteSelected} className="p-2 hover:bg-destructive/10 text-destructive rounded-full transition-colors" title="Delete"><Trash2 size={18} /></button></div></Panel>}
         </ReactFlow>
