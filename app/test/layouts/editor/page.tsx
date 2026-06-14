@@ -6,10 +6,10 @@ import EditorInner from "./editor-inner";
 
 export default function Test() {
     return (
-        <div> 
-            <TestEditor>
-                <EditorInner/>
-            </TestEditor>
+        <div style={{
+            height: "100vh"
+        }}>
+            <TestEditor />
         </div>
     );
 }
