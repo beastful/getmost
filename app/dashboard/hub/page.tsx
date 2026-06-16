@@ -79,7 +79,7 @@ function TemplateCard({
       </div>
 
       <CardHeader className="pb-0">
-        <CardTitle className="text-base line-clamp-1" title={entity.name}>
+        <CardTitle className="text-base line-clamp-2" title={entity.name}>
           {entity.name}
         </CardTitle>
         <CardDescription className="line-clamp-2 text-sm mt-1.5 min-h-[2.5rem]">

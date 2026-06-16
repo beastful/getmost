@@ -2,33 +2,37 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Switch } from "@/components/ui/switch";
 import {
   ArrowRight,
   Check,
-  Zap,
   Shield,
-  Layers,
   Workflow,
-  Bot,
   Globe,
   Clock,
   Code2,
-  BarChart3,
   Lock,
-  ChevronRight,
-  Sparkles,
   Plug,
   Server,
-  Cpu,
-  Network,
   X,
-  Menu
+  Menu,
+  Network,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -54,7 +58,7 @@ export default function KnitLandingPage() {
     { label: "Продукт", href: "#product" },
     { label: "Решения", href: "#solutions" },
     { label: "Тарифы", href: "#pricing" },
-    { label: "Документация", href: "#docs" },
+    { label: "FAQ", href: "#faq" },
   ];
 
   const features = [
@@ -63,12 +67,6 @@ export default function KnitLandingPage() {
       title: "Более 200 B2B-коннекторов",
       description:
         "Готовые интеграции с Salesforce, HubSpot, SAP, NetSuite, Workday и всей экосистемой B2B SaaS.",
-    },
-    {
-      icon: <Bot className="h-6 w-6" />,
-      title: "Шлюз ИИ-агентов",
-      description:
-        "Позвольте ИИ-агентам безопасно читать, записывать и действовать с данными вашей платформы через единый протокол агентов.",
     },
     {
       icon: <Workflow className="h-6 w-6" />,
@@ -96,6 +94,7 @@ export default function KnitLandingPage() {
     },
   ];
 
+  // 3 блока проблем в разделе «Проблема»
   const problems = [
     {
       title: "Отставание по интеграциям",
@@ -168,8 +167,8 @@ export default function KnitLandingPage() {
     {
       name: "Рост",
       description: "Для растущих B2B-SaaS-команд",
-      monthlyPrice: 299,
-      annualPrice: 249,
+      monthlyPrice: 29990,
+      annualPrice: 24990,
       features: [
         "20 активных интеграций",
         "100 000 API-вызовов/мес",
@@ -187,8 +186,8 @@ export default function KnitLandingPage() {
     {
       name: "Масштаб",
       description: "Для быстрорастущих компаний",
-      monthlyPrice: 999,
-      annualPrice: 799,
+      monthlyPrice: 99990,
+      annualPrice: 79990,
       features: [
         "Неограниченное число интеграций",
         "1 млн API-вызовов/мес",
@@ -232,9 +231,9 @@ export default function KnitLandingPage() {
         "Мост создан специально для продуктов B2B SaaS и инфраструктуры ИИ-агентов. В отличие от универсальных инструментов автоматизации, мы предоставляем унифицированный API-слой, нативные протоколы ИИ-агентов, глубокую двустороннюю синхронизацию и корпоративную безопасность, рассчитанные на продуктовые интеграции, а не только на сценарии.",
     },
     {
-      question: "Могут ли ИИ-агенты действительно взаимодействовать с моей платформой через Мост?",
+      question: "Какие российские аналоги существуют?",
       answer:
-        "Да. Мост реализует протокол Model Context Protocol (MCP) и предоставляет специализированные конечные точки для агентов с детальными областями разрешений, наблюдаемостью и ограничением скорости. ИИ-агенты могут безопасно и прозрачно читать, записывать и выполнять действия на вашей платформе.",
+        "На российском рынке представлены решения вроде 1C Integration, Unisuite Connect, K2 Cloud, Veeb, Simple и Botter. Они также предлагают интеграционные возможности, но часто ориентированы на 1C-ориентированные сценарии или конкретные бизнес-процессы. Мост позиционируется как универсальная облачная платформа для трансформации ИТ-ландшафта с единым API-шлюзом и микросервисной архитектурой.",
     },
     {
       question: "Сколько времени занимает запуск новой интеграции?",
@@ -247,11 +246,17 @@ export default function KnitLandingPage() {
         "Абсолютно. Мост сертифицирован по SOC 2 Type II, соответствует GDPR и использует сквозное шифрование. Данные ваших клиентов никогда не попадают в наше постоянное хранилище, если вы явно не настроите это. Мы выступаем в роли защищённого посредника и слоя преобразования данных.",
     },
     {
-      question: "Поддерживаете ли вы развёртывание на собственных площадках или в частном облаке?",
+      question: "Поддерживаете ли вы развёртывание на собственных площадях или в частном облаке?",
       answer:
         "Корпоративные клиенты могут развёртывать Мост в собственном виртуальном частном облаке (VPC) или частном облаке (AWS, Azure, GCP) с выделенной инфраструктурой и требованиями к локализации данных.",
     },
   ];
+
+  const formatPrice = (value: number | null) => {
+    if (value === null) return "По запросу";
+    if (value === 0) return "0 ₽";
+    return new Intl.NumberFormat("ru-RU").format(value) + " ₽";
+  };
 
   return (
     <div className="min-h-screen bg-white text-gray-900 antialiased">
@@ -260,7 +265,7 @@ export default function KnitLandingPage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center">
-             <img width="30" src="/logo.svg"/>
+              <img width="30" src="/logo.svg" alt="Логотип Мост" />
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-900">Мост</span>
           </div>
@@ -293,6 +298,7 @@ export default function KnitLandingPage() {
           <button
             className="md:hidden p-2 text-gray-600"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -340,7 +346,6 @@ export default function KnitLandingPage() {
             animate="animate"
             variants={staggerContainer}
           >
-        
             <motion.h1
               variants={fadeInUp}
               className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900"
@@ -348,7 +353,8 @@ export default function KnitLandingPage() {
               Единый интеграционный слой{" "}
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-600">
                 для B2B SaaS
-              </span>{" "}<br />
+              </span>{" "}
+              <br />
               и ИИ-агентов
             </motion.h1>
 
@@ -372,10 +378,10 @@ export default function KnitLandingPage() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </a>
-              <Button size="lg" variant="outline" className="px-8 border-gray-300 text-gray-700 hover:bg-gray-50">
+              {/* <Button size="lg" variant="outline" className="px-8 border-gray-300 text-gray-700 hover:bg-gray-50">
                 <Globe className="mr-2 h-4 w-4" />
                 Смотреть демо
-              </Button>
+              </Button> */}
             </motion.div>
 
             <motion.p
@@ -388,11 +394,11 @@ export default function KnitLandingPage() {
         </div>
       </section>
 
-      {/* Logos / Social Proof (empty for design) */}
+      {/* Logos / Social Proof */}
       <section className="border-y border-gray-200 bg-gray-50/50 py-12">
       </section>
 
-      {/* Problem Section */}
+      {/* Problem Section — 3 блока */}
       <section id="solutions" className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
@@ -516,85 +522,6 @@ export default function KnitLandingPage() {
         </div>
       </section>
 
-      {/* AI Agent Section */}
-      <section className="py-24 md:py-32 bg-gradient-to-b from-red-950 via-purple-950 to-gray-900 text-white overflow-hidden relative">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px]" />
-        <div className="container mx-auto px-4 md:px-6 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <Badge className="mb-6 bg-red-500/20 text-red-200 border-red-500/30">
-                <Cpu className="mr-1 h-3 w-3" />
-                Шлюз ИИ-агентов
-              </Badge>
-              <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">
-                Ваша платформа готова к эре ИИ
-              </h2>
-              <p className="text-lg text-red-100/80 mb-8 leading-relaxed">
-                ИИ-агенты — это новые пользователи. Мост предоставляет безопасную инфраструктуру для взаимодействия автономных систем с вашей B2B-платформой — с полной наблюдаемостью, управлением правами доступа и аудиторскими журналами.
-              </p>
-              <ul className="space-y-4">
-                {[
-                  "Соответствие протоколу Model Context Protocol (MCP)",
-                  "Детальное разграничение прав доступа агентов",
-                  "Мониторинг активности агентов в реальном времени",
-                  "Автоматическое распознавание схем для больших языковых моделей",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <div className="mt-1 h-5 w-5 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                      <Check className="h-3 w-3 text-red-300" />
-                    </div>
-                    <span className="text-red-100/90">{item}</span>
-                  </li>
-                ))}
-              </ul>
-              <a href="/ai-gateway">
-                <Button
-                  size="lg"
-                  className="mt-8 bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white"
-                >
-                  Изучить шлюз ИИ
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </a>
-            </div>
-            <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-red-500 to-purple-600 rounded-2xl opacity-20 blur-2xl" />
-              <Card className="relative bg-gray-900/80 border-gray-700/50 backdrop-blur-sm">
-                <CardContent className="p-6 font-mono text-sm">
-                  <div className="flex items-center gap-2 mb-4 text-gray-500">
-                    <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                    <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                    <div className="h-3 w-3 rounded-full bg-green-500/80" />
-                    <span className="ml-2 text-xs">agent-session.json</span>
-                  </div>
-                  <pre className="text-pink-300 overflow-x-auto">
-{`{
-  "agent_id": "agt_2vR9kLmP",
-  "platform": "customer-crm",
-  "permissions": [
-    "contacts:read",
-    "deals:write",
-    "tasks:execute"
-  ],
-  "context": {
-    "user_id": "usr_8842",
-    "tenant": "acme-corp",
-    "session_ttl": 3600
-  },
-  "audit_level": "full",
-  "rate_limit": {
-    "requests_per_min": 120,
-    "burst": 20
-  }
-}`}
-                  </pre>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Pricing Section */}
       <section id="pricing" className="py-24 md:py-32 bg-white">
         <div className="container mx-auto px-4 md:px-6">
@@ -640,7 +567,7 @@ export default function KnitLandingPage() {
                     {plan.monthlyPrice !== null ? (
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl font-bold text-gray-900">
-                          ${isAnnual ? plan.annualPrice : plan.monthlyPrice}
+                          {formatPrice(isAnnual ? plan.annualPrice : plan.monthlyPrice)}
                         </span>
                         <span className="text-gray-500">/мес</span>
                       </div>
@@ -649,7 +576,7 @@ export default function KnitLandingPage() {
                     )}
                     {isAnnual && plan.monthlyPrice !== null && plan.monthlyPrice > 0 && (
                       <p className="text-sm text-gray-500 mt-1">
-                        ${plan.annualPrice * 12} при ежегодной оплате
+                        {formatPrice((plan.annualPrice ?? 0) * 12)} при ежегодной оплате
                       </p>
                     )}
                   </div>
@@ -686,7 +613,7 @@ export default function KnitLandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-24 md:py-32 bg-gray-50">
+      <section id="faq" className="py-24 md:py-32 bg-gray-50">
         <div className="container mx-auto px-4 md:px-6 max-w-3xl">
           <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4 border-gray-300 text-gray-600">
@@ -712,42 +639,7 @@ export default function KnitLandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 md:py-32 bg-white">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-500 to-purple-600 p-8 md:p-16 text-center">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px]" />
-            <div className="relative z-10 max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Готовы унифицировать свои интеграции?
-              </h2>
-              <p className="text-lg text-white/80 mb-8">
-                Присоединяйтесь к сотням B2B-SaaS-команд, которые внедряют интеграции быстрее с помощью Моста. Начните бесплатно уже сегодня.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="/dashboard">
-                  <Button
-                    size="lg"
-                    className="bg-white text-red-600 hover:bg-red-50 px-8"
-                  >
-                    Начать бесплатно
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </a>
-                <a href="/contact">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-white/50 text-white hover:bg-white/10 px-8"
-                  >
-                    Поговорить с отделом продаж
-                  </Button>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+    
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white py-12">
         <div className="container mx-auto px-4 md:px-6">
@@ -762,44 +654,16 @@ export default function KnitLandingPage() {
               <p className="text-sm text-gray-600 max-w-xs">
                 Унифицированная интеграционная платформа для B2B SaaS и инфраструктуры ИИ-агентов.
               </p>
-              <div className="flex gap-4 mt-4">
-              </div>
             </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Продукт</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><a href="#" className="hover:text-red-500">Коннекторы</a></li>
-                <li><a href="#" className="hover:text-red-500">Шлюз ИИ</a></li>
-                <li><a href="#" className="hover:text-red-500">Сценарии</a></li>
-                <li><a href="#" className="hover:text-red-500">Безопасность</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Разработчикам</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><a href="#" className="hover:text-red-500">Документация</a></li>
-                <li><a href="#" className="hover:text-red-500">Справочник API</a></li>
-                <li><a href="#" className="hover:text-red-500">SDK</a></li>
-                <li><a href="#" className="hover:text-red-500">Статус</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Компания</h4>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><a href="#" className="hover:text-red-500">О компании</a></li>
-                <li><a href="#" className="hover:text-red-500">Блог</a></li>
-                <li><a href="#" className="hover:text-red-500">Вакансии</a></li>
-                <li><a href="#" className="hover:text-red-500">Контакты</a></li>
-              </ul>
-            </div>
+            
           </div>
           <Separator className="bg-gray-200" />
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 text-sm text-gray-500">
             <p>© 2026 Мост Интеграция. Все права защищены.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-red-500">Конфиденциальность</a>
-              <a href="#" className="hover:text-red-500">Условия использования</a>
-              <a href="#" className="hover:text-red-500">Файлы cookie</a>
+              {/* <span>Конфиденциальность</span>
+              <span>Условия использования</span>
+              <span>Файлы cookie</span> */}
             </div>
           </div>
         </div>

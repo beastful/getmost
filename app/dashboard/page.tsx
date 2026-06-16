@@ -127,7 +127,7 @@ export default function DashboardHomePage() {
             </Link>
           </motion.div>
 
-          {/* Getting started checklist */}
+          {/* Getting started checklist
           <motion.div variants={fadeInUp}>
             <Card className="border-gray-200 bg-gray-50/50 shadow-sm">
               <CardHeader>
@@ -156,9 +156,9 @@ export default function DashboardHomePage() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
+          </motion.div> */}
 
-          {/* Recent projects placeholder (empty state) */}
+          {/* Recent projects placeholder (empty state)
           <motion.div variants={fadeInUp}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Последние проекты</h2>
@@ -181,7 +181,7 @@ export default function DashboardHomePage() {
                 </Link>
               </div>
             </Card>
-          </motion.div>
+          </motion.div> */}
         </motion.div>
       </main>
     </div>

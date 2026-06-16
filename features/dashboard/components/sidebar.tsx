@@ -121,13 +121,13 @@ const data = {
         }
     ],
     documents: [
-         {
-            name: "Магазин",
-            url: "/dashboard/store",
-            icon: (
-                <Store />
-            ),
-        },
+        //  {
+        //     name: "Магазин",
+        //     url: "/dashboard/store",
+        //     icon: (
+        //         <Store />
+        //     ),
+        // },
         {
             name: "Хаб",
             url: "/dashboard/hub",
@@ -135,13 +135,13 @@ const data = {
                 <Box />
             ),
         },
-        {
-            name: "Витрина",
-            url: "/dashboard/featured",
-            icon: (
-                <Clapperboard />
-            ),
-        },
+        // {
+        //     name: "Витрина",
+        //     url: "/dashboard/featured",
+        //     icon: (
+        //         <Clapperboard />
+        //     ),
+        // },
     ],
 }
 
@@ -171,7 +171,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         fill="#00000000" />
                                 </svg>
                                 <span className="text-base font-semibold">
-                                    <span className="text-gray-400">get</span> Мост <span className="text-gray-400">.app</span>
+                                    <span className="text-gray-400">Платформа</span> Мост
                                 </span>
                             </a>
                         </SidebarMenuButton>
